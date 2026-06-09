@@ -26,16 +26,17 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app
-USER appuser
 
 EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:4000/api/health || exit 1
 
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+USER appuser
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
