@@ -27,6 +27,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+COPY prestart.js /app/prestart.js
+
 RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app
 
 EXPOSE 4000
@@ -36,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 USER appuser
 
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "prestart.js"]
