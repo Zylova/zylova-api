@@ -1,16 +1,11 @@
 import { Controller, Get } from "@nestjs/common";
-import { ApiTags, ApiOperation } from "@nestjs/swagger";
+import { SkipThrottle } from "@nestjs/throttler";
 
-@ApiTags("health")
+@SkipThrottle()
 @Controller()
 export class AppController {
   @Get("health")
-  @ApiOperation({ summary: "Health check endpoint" })
-  health() {
-    return {
-      status: "ok",
-      timestamp: new Date().toISOString(),
-      version: "1.0.0",
-    };
+  health(): { status: string } {
+    return { status: "ok" };
   }
 }
