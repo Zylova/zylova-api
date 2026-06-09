@@ -30,18 +30,28 @@ model User {
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  price       Float
-  category    Category
-  tags        String[]
-  image       String
-  demoUrl     String?
-  features    String[]
-  published   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  name           String
+  description    String
+  price          Float
+  originalPrice  Float?
+  category       Category
+  tags           String[]
+  image          String
+  screenshots    String[]
+  demoUrl        String?
+  features       String[]
+  whatsIncluded  String[]
+  requirements   String[]
+  license        String   @default("standard")
+  version        String   @default("1.0.0")
+  lastUpdated    String   @default("")
+  salesCount     Int      @default(0)
+  rating         Float    @default(0)
+  highlighted    Boolean  @default(false)
+  published      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@map("products")
 }
@@ -76,4 +86,18 @@ model NewsletterSubscriber {
   createdAt DateTime @default(now())
 
   @@map("newsletter_subscribers")
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  email         String
+  items         Json
+  total         Float
+  status        String      @default("paid")
+  downloadToken String      @unique
+  stripeSession String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("orders")
 }

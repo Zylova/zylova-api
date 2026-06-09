@@ -1,98 +1,137 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Zylova API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![NestJS](https://img.shields.io/badge/NestJS-11-red)](https://nestjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-7-blue)](https://prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)](https://postgresql.org/)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Enterprise backend for Zylova Digital Agency — a REST API built with NestJS, Prisma, and PostgreSQL.
 
-## Description
+## Tech Stack
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **Framework:** NestJS 11
+- **ORM:** Prisma 7 with PostgreSQL adapter
+- **Database:** PostgreSQL 16
+- **Auth:** JWT with bcrypt password hashing
+- **Email:** Nodemailer (Mailtrap for dev)
+- **File Upload:** Multer with disk storage
+- **Documentation:** Swagger/OpenAPI at `GET /api/docs`
 
-## Project setup
+## Quick Start
 
 ```bash
-$ npm install
+# Prerequisites: Node 22+, Docker, Docker Compose
+
+# 1. Clone & install
+git clone https://github.com/Zylova/zylova-api.git
+cd zylova-api
+npm install
+
+# 2. Set environment variables (edit .env)
+cp .env.example .env
+
+# 3. Start PostgreSQL with Docker
+docker compose up -d
+
+# 4. Run migrations + seed
+npx prisma migrate dev --name init
+npx prisma db seed
+
+# 5. Start dev server
+npm run start:dev
 ```
 
-## Compile and run the project
+## API Endpoints
+
+| Module        | Method | Endpoint                    | Description              | Auth |
+|---------------|--------|-----------------------------|--------------------------|------|
+| **Auth**      | POST   | `/api/auth/register`        | Register new user        | ❌   |
+|               | POST   | `/api/auth/login`           | Login                    | ❌   |
+|               | GET    | `/api/auth/profile`         | Get user profile         | ✅   |
+| **Products**  | GET    | `/api/products`             | List published products  | ❌   |
+|               | GET    | `/api/products/:id`         | Get product by ID        | ❌   |
+|               | POST   | `/api/products`             | Create product           | ✅   |
+|               | PATCH  | `/api/products/:id`         | Update product           | ✅   |
+|               | DELETE | `/api/products/:id`         | Delete product           | ✅   |
+| **Services**  | GET    | `/api/services`             | List services            | ❌   |
+|               | POST   | `/api/services`             | Create service           | ✅   |
+|               | PATCH  | `/api/services/:id`         | Update service           | ✅   |
+|               | DELETE | `/api/services/:id`         | Delete service           | ✅   |
+| **Contact**   | POST   | `/api/contact`              | Submit contact form      | ❌   |
+|               | GET    | `/api/contact`              | List submissions         | ✅   |
+| **Newsletter**| POST   | `/api/newsletter/subscribe` | Subscribe to newsletter  | ❌   |
+|               | POST   | `/api/newsletter/unsubscribe` | Unsubscribe            | ❌   |
+| **Upload**    | POST   | `/api/upload`               | Upload file (image)      | ✅   |
+
+> Full OpenAPI docs available at `http://localhost:4000/api/docs` when running in dev mode.
+
+## Environment Variables
+
+| Variable          | Description                  | Default                          |
+|-------------------|------------------------------|----------------------------------|
+| `DATABASE_URL`    | PostgreSQL connection string | `postgresql://...`               |
+| `JWT_SECRET`      | JWT signing secret           | `super-secret-jwt-key-...`       |
+| `JWT_EXPIRATION`  | Token expiry                 | `7d`                             |
+| `PORT`            | Server port                  | `4000`                           |
+| `CORS_ORIGIN`     | Allowed CORS origin          | `http://localhost:3000`          |
+| `SMTP_HOST`       | SMTP server host             | `smtp.mailtrap.io`               |
+| `SMTP_PORT`       | SMTP server port             | `2525`                           |
+| `SMTP_USER`       | SMTP username                | —                                |
+| `SMTP_PASS`       | SMTP password                | —                                |
+| `CONTACT_EMAIL`   | Contact notification email   | `hello@zylova.com`               |
+| `UPLOAD_DIR`      | File upload directory        | `./uploads`                      |
+
+## Scripts
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run start:dev       # Start dev server with watch mode
+npm run build           # Compile to dist/
+npm run lint            # ESLint
+npm run typecheck       # TypeScript type check
+npm test                # Run unit tests
+npm run test:cov        # Unit tests with coverage
+npm run test:e2e        # E2E tests (requires running app)
+npm run prisma:migrate  # Run Prisma migrations
+npm run prisma:seed     # Seed database
+npm run docker:up       # Start Docker services
+npm run docker:down     # Stop Docker services
 ```
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Docker (recommended)
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Build and run with Docker Compose
+docker compose up -d --build
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Manual
 
-## Resources
+```bash
+npm run build
+npm run start:prod
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Ensure `NODE_ENV=production` and all environment variables are configured for production (PostgreSQL, SMTP credentials, strong JWT secret).
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Project Structure
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```
+src/
+├── auth/          # Authentication (JWT, register, login)
+├── common/        # Shared decorators, filters, guards, pipes
+├── config/        # NestJS ConfigModule configuration
+├── contact/       # Contact form submissions
+├── newsletter/    # Email newsletter subscriptions
+├── prisma/        # Prisma client service
+├── products/      # Product CRUD
+├── services/      # Service listings CRUD
+├── upload/        # File upload handling
+├── app.module.ts  # Root module
+└── main.ts        # Entry point
+```
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT — see [LICENSE](LICENSE).
