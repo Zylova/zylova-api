@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import * as nodemailer from "nodemailer";
@@ -12,17 +12,21 @@ export class ContactService {
   ) {}
 
   async submit(dto: CreateContactSubmissionDto) {
-    const submission = await this.prisma.contactSubmission.create({ data: dto });
+    const submission = await this.prisma.contactSubmission.create({ data: { ...dto, status: "unread" } });
 
-    await this.sendEmailNotification(dto).catch(() => {
-      // Email failure should not block the submission
-    });
+    await this.sendEmailNotification(dto).catch(() => {});
 
     return submission;
   }
 
   findAll() {
     return this.prisma.contactSubmission.findMany({ orderBy: { createdAt: "desc" } });
+  }
+
+  async updateStatus(id: string, status: string) {
+    const contact = await this.prisma.contactSubmission.findUnique({ where: { id } });
+    if (!contact) throw new NotFoundException("Contact not found");
+    return this.prisma.contactSubmission.update({ where: { id }, data: { status } });
   }
 
   private async sendEmailNotification(dto: CreateContactSubmissionDto) {

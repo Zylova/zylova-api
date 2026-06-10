@@ -1,20 +1,15 @@
-import { IsEmail, IsString, IsOptional } from "class-validator";
+import { IsEmail, IsString, IsOptional, IsIn } from "class-validator";
 
 export class CreateContactSubmissionDto {
-  @IsString()
-  name: string;
+  @IsString() name: string;
+  @IsEmail() email: string;
+  @IsOptional() @IsString() company?: string;
+  @IsOptional() @IsString() service?: string;
+  @IsString() message: string;
+}
 
-  @IsEmail()
-  email: string;
-
-  @IsOptional()
+export class UpdateContactStatusDto {
   @IsString()
-  company?: string;
-
-  @IsOptional()
-  @IsString()
-  service?: string;
-
-  @IsString()
-  message: string;
+  @IsIn(["unread", "read", "replied"])
+  status: string;
 }

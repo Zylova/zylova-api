@@ -9,6 +9,7 @@ import { ContactModule } from "./contact/contact.module";
 import { NewsletterModule } from "./newsletter/newsletter.module";
 import { UploadModule } from "./upload/upload.module";
 import { OrdersModule } from "./orders/orders.module";
+import { AdminModule } from "./admin/admin.module";
 import { AppController } from "./app.controller";
 
 @Module({
@@ -23,6 +24,7 @@ import { AppController } from "./app.controller";
     NewsletterModule,
     UploadModule,
     OrdersModule,
+    AdminModule,
   ],
   controllers: [AppController],
 })

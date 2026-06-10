@@ -1,7 +1,7 @@
-import { Controller, Post, Get, Body, UseGuards } from "@nestjs/common";
+import { Controller, Post, Get, Patch, Body, Param, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { ContactService } from "./contact.service";
-import { CreateContactSubmissionDto } from "./dto/contact.dto";
+import { CreateContactSubmissionDto, UpdateContactStatusDto } from "./dto/contact.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../common/decorators/roles.decorator";
@@ -24,5 +24,14 @@ export class ContactController {
   @ApiOperation({ summary: "Get all contact submissions (admin)" })
   findAll() {
     return this.contactService.findAll();
+  }
+
+  @Patch(":id/status")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("ADMIN")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Update contact submission status (admin)" })
+  updateStatus(@Param("id") id: string, @Body() dto: UpdateContactStatusDto) {
+    return this.contactService.updateStatus(id, dto.status);
   }
 }

@@ -12,9 +12,18 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  @ApiOperation({ summary: "Get all published products" })
+  @ApiOperation({ summary: "Get all approved products" })
   findAll(@Query() query: ProductQueryDto) {
     return this.productsService.findAll(query);
+  }
+
+  @Get("admin")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("ADMIN")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get all products including non-approved (admin)" })
+  findAllAdmin() {
+    return this.productsService.findAllAdmin();
   }
 
   @Get(":id")
@@ -39,6 +48,15 @@ export class ProductsController {
   @ApiOperation({ summary: "Update a product (admin)" })
   update(@Param("id") id: string, @Body() dto: UpdateProductDto) {
     return this.productsService.update(id, dto);
+  }
+
+  @Patch(":id/status")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("ADMIN")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Update product status (admin)" })
+  updateStatus(@Param("id") id: string, @Body() dto: { status: string; rejectReason?: string }) {
+    return this.productsService.updateStatus(id, dto.status as any, dto.rejectReason);
   }
 
   @Delete(":id")

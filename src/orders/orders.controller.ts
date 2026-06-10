@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Query, UseGuards } from "@nestjs/common";
+import { Controller, Post, Get, Patch, Body, Param, Query, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { OrdersService, CreateOrderDto } from "./orders.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -35,5 +35,17 @@ export class OrdersController {
   @ApiOperation({ summary: "Get orders by email" })
   findByEmail(@Query("email") email: string) {
     return this.ordersService.findByEmail(email);
+  }
+
+  @Patch(":id/status")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("ADMIN")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Update order status (admin)" })
+  updateStatus(
+    @Param("id") id: string,
+    @Body() dto: { status: string; refundReason?: string },
+  ) {
+    return this.ordersService.updateStatus(id, dto.status, dto.refundReason);
   }
 }

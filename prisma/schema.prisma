@@ -11,6 +11,13 @@ enum Role {
   USER
 }
 
+enum ProductStatus {
+  draft
+  pending
+  approved
+  rejected
+}
+
 enum Category {
   web
   app
@@ -18,13 +25,16 @@ enum Category {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password        String
+  name            String
+  role            Role      @default(USER)
+  banned          Boolean   @default(false)
+  resetToken      String?
+  resetTokenExpiry DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@map("users")
 }
@@ -48,9 +58,10 @@ model Product {
   lastUpdated    String   @default("")
   salesCount     Int      @default(0)
   rating         Float    @default(0)
-  highlighted    Boolean  @default(false)
-  published      Boolean  @default(true)
-  createdAt      DateTime @default(now())
+  highlighted    Boolean        @default(false)
+  status         ProductStatus  @default(pending)
+  rejectReason   String?
+  createdAt      DateTime       @default(now())
   updatedAt      DateTime @updatedAt
 
   @@map("products")
@@ -75,6 +86,7 @@ model ContactSubmission {
   company   String?
   service   String?
   message   String
+  status    String   @default("unread")
   createdAt DateTime @default(now())
 
   @@map("contact_submissions")
@@ -96,6 +108,7 @@ model Order {
   status        String      @default("paid")
   downloadToken String      @unique
   stripeSession String?
+  refundReason  String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

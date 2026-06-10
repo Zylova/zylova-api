@@ -17,7 +17,7 @@ async function main() {
     {
       id: "e-commerce-ultra", name: "E-Commerce Ultra",
       description: "Multi-channel e-commerce platform with Stripe, admin dashboard, and SEO optimization.",
-      price: 499, category: "web", tags: ["Next.js 14", "Stripe Ready", "SEO Optimized", "Full Source Code"],
+      price: 499, category: "web", status: "approved", tags: ["Next.js 14", "Stripe Ready", "SEO Optimized", "Full Source Code"],
       image: "https://images.unsplash.com/photo-1557821552-17105176677c?auto=format&fit=crop&q=80&w=800",
       demoUrl: "https://demo.example.com/ecommerce",
       features: ["Stripe Payment Integration", "Product CMS", "SEO Optimization", "100% Responsive", "PWA Support", "Admin Dashboard"],
@@ -25,7 +25,7 @@ async function main() {
     {
       id: "saas-boilerplate-pro", name: "SaaS Boilerplate Pro",
       description: "Complete SaaS starter with auth, subscriptions, team management, and REST API.",
-      price: 299, category: "saas", tags: ["Next.js 14", "Stripe Ready", "SEO Optimized", "Full Source Code"],
+      price: 299, category: "saas", status: "approved", tags: ["Next.js 14", "Stripe Ready", "SEO Optimized", "Full Source Code"],
       image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800",
       demoUrl: "https://demo.example.com/saas",
       features: ["Auth & Membership", "Subscription Billing", "Team Management", "REST API", "Role-based Access", "Analytics Dashboard"],
@@ -33,7 +33,7 @@ async function main() {
     {
       id: "agency-portfolio-system", name: "Agency Portfolio System",
       description: "Premium portfolio with Bento Grid, animations, dark mode, and built-in blog.",
-      price: 149, category: "web", tags: ["Next.js 14", "Framer Motion", "SEO Optimized", "Full Source Code"],
+      price: 149, category: "web", status: "approved", tags: ["Next.js 14", "Framer Motion", "SEO Optimized", "Full Source Code"],
       image: "https://images.unsplash.com/photo-1487014679447-9f8336841d58?auto=format&fit=crop&q=80&w=800",
       demoUrl: "https://demo.example.com/portfolio",
       features: ["Bento Grid Layout", "Framer Motion Animations", "Dark Mode Support", "Built-in Blog", "Contact Form", "Project CMS"],
