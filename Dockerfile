@@ -29,6 +29,7 @@ COPY --from=builder /app/prisma.config.js ./prisma.config.js
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY prestart.js /app/prestart.js
+COPY seed.js /app/seed.js
 
 RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app
 
