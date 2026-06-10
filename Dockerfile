@@ -25,6 +25,7 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.js ./prisma.config.js
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY prestart.js /app/prestart.js
