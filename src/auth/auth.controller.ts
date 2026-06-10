@@ -1,9 +1,11 @@
-import { Controller, Post, Get, Body, UseGuards } from "@nestjs/common";
+import { Controller, Post, Get, Body, UseGuards, Req, Res, Query } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
+import { AuthGuard } from "@nestjs/passport";
 import { AuthService } from "./auth.service";
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from "./dto/auth.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import type { Request, Response } from "express";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -40,5 +42,37 @@ export class AuthController {
   @ApiOperation({ summary: "Reset password with token" })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.password);
+  }
+
+  @Get("google")
+  @UseGuards(AuthGuard("google"))
+  @ApiOperation({ summary: "Login with Google" })
+  googleAuth() {
+    // Guard redirects to Google
+  }
+
+  @Get("google/callback")
+  @UseGuards(AuthGuard("google"))
+  @ApiOperation({ summary: "Google OAuth callback" })
+  async googleCallback(@Req() req: any, @Res() res: Response) {
+    const result = await this.authService.findOrCreateOAuthUser("google", req.user);
+    const frontendUrl = process.env.CORS_ORIGIN || "http://localhost:3000";
+    res.redirect(`${frontendUrl}/auth/callback?token=${result.token}&user=${encodeURIComponent(JSON.stringify(result.user))}`);
+  }
+
+  @Get("facebook")
+  @UseGuards(AuthGuard("facebook"))
+  @ApiOperation({ summary: "Login with Facebook" })
+  facebookAuth() {
+    // Guard redirects to Facebook
+  }
+
+  @Get("facebook/callback")
+  @UseGuards(AuthGuard("facebook"))
+  @ApiOperation({ summary: "Facebook OAuth callback" })
+  async facebookCallback(@Req() req: any, @Res() res: Response) {
+    const result = await this.authService.findOrCreateOAuthUser("facebook", req.user);
+    const frontendUrl = process.env.CORS_ORIGIN || "http://localhost:3000";
+    res.redirect(`${frontendUrl}/auth/callback?token=${result.token}&user=${encodeURIComponent(JSON.stringify(result.user))}`);
   }
 }

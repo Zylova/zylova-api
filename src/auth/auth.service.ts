@@ -1,7 +1,6 @@
 import {
   ConflictException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
   BadRequestException,
 } from "@nestjs/common";
@@ -33,8 +32,9 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) throw new UnauthorizedException("Invalid credentials");
-
     if (user.banned) throw new UnauthorizedException("Account is banned");
+
+    if (!user.password) throw new UnauthorizedException("This account uses social login. Please sign in with Google or Facebook.");
 
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException("Invalid credentials");
@@ -52,16 +52,14 @@ export class AuthService {
     if (!user) return { message: "If the email exists, a reset link has been sent" };
 
     const resetToken = uuid();
-    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: { resetToken, resetTokenExpiry },
     });
 
-    // In production, send email via SMTP
     console.log(`Password reset token for ${email}: ${resetToken}`);
-
     return { message: "If the email exists, a reset link has been sent" };
   }
 
@@ -79,6 +77,48 @@ export class AuthService {
     });
 
     return { message: "Password reset successfully" };
+  }
+
+  async findOrCreateOAuthUser(provider: string, profile: { email?: string; firstName?: string; lastName?: string; picture?: string; googleId?: string; facebookId?: string }) {
+    if (!profile.email) throw new BadRequestException("Email is required from OAuth provider");
+
+    const idField = provider === "google" ? "googleId" : "facebookId";
+    const profileId = provider === "google" ? profile.googleId : profile.facebookId;
+
+    // Try to find existing user by OAuth ID or email
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { [idField]: profileId },
+          { email: profile.email },
+        ],
+      },
+    });
+
+    if (user) {
+      // Link OAuth ID if not already linked
+      if (!user[idField]) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { [idField]: profileId },
+        });
+      }
+    } else {
+      // Create new user
+      const name = [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.email.split("@")[0];
+      user = await this.prisma.user.create({
+        data: {
+          email: profile.email,
+          name,
+          [idField]: profileId,
+          password: "", // No password for OAuth users
+        },
+      });
+    }
+
+    if (user.banned) throw new UnauthorizedException("Account is banned");
+
+    return { token: this.generateToken(user.id, user.email, user.role), user: this.sanitize(user) };
   }
 
   private generateToken(id: string, email: string, role: string) {

@@ -31,6 +31,8 @@ model User {
   name            String
   role            Role      @default(USER)
   banned          Boolean   @default(false)
+  googleId        String?   @unique
+  facebookId      String?   @unique
   resetToken      String?
   resetTokenExpiry DateTime?
   createdAt       DateTime  @default(now())
