@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductStatus } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
@@ -221,7 +222,23 @@ export class AdminService {
 
   async listNewsletterSubscribers() {
     return this.prisma.newsletterSubscriber.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
+  }
+
+  async resetUsers(emails: string[]) {
+    await this.prisma.user.deleteMany();
+    const created: Array<{ id: string; email: string }> = [];
+
+    for (const email of emails) {
+      const hash = await bcrypt.hash("admin123", 10);
+      const user = await this.prisma.user.create({
+        data: { email, password: hash, name: email.split("@")[0], role: "ADMIN" },
+      });
+      created.push(user);
+    }
+
+    await this.notifyStats();
+    return { message: `Deleted all users, created ${created.length} admin(s)`, users: created.map((u) => u.email) };
   }
 }

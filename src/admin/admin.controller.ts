@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Param,
   Query,
@@ -107,5 +108,11 @@ export class AdminController {
   @ApiOperation({ summary: 'List newsletter subscribers' })
   listNewsletter() {
     return this.adminService.listNewsletterSubscribers();
+  }
+
+  @Post('reset-users')
+  @ApiOperation({ summary: 'Delete all users and reseed admin accounts' })
+  resetUsers(@Body() body: { emails: string[] }) {
+    return this.adminService.resetUsers(body.emails);
   }
 }

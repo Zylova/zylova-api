@@ -5,13 +5,20 @@ const bcrypt = require("bcrypt");
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
 async function main() {
+  await prisma.user.deleteMany();
+  console.log("Cleared existing users");
+
   const hashedPassword = await bcrypt.hash("admin123", 10);
-  await prisma.user.upsert({
-    where: { email: "admin@zylova.com" },
-    update: {},
-    create: { email: "admin@zylova.com", password: hashedPassword, name: "Zylova Admin", role: "ADMIN" },
+
+  await prisma.user.create({
+    data: { email: "ttuan0147@gmail.com", password: hashedPassword, name: "Tran Tuan", role: "ADMIN" },
   });
-  console.log("Admin user seeded");
+  console.log("Admin ttuan0147@gmail.com seeded");
+
+  await prisma.user.create({
+    data: { email: "dotruongphat9@gmail.com", password: hashedPassword, name: "Do Truong Phat", role: "ADMIN" },
+  });
+  console.log("Admin dotruongphat9@gmail.com seeded");
 
   const products = [
     {
