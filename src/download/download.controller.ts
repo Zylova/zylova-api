@@ -6,8 +6,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import type { Request, Response } from 'express';
-import * as fs from 'fs';
-import * as path from 'path';
 
 @ApiTags('download')
 @Controller('download')
@@ -30,26 +28,17 @@ export class DownloadController {
     @Res() res: Response,
   ) {
     const ip = req.ip;
-    const result = await this.downloadService.downloadProduct(
-      token,
-      productId,
-      ip,
-    );
+    const result = await this.downloadService.downloadProduct(token, productId, ip);
 
-    const filePath = path.resolve(result.filePath);
-    if (!fs.existsSync(filePath)) {
+    if (!result.stream) {
       return res.status(404).json({ error: 'File not found on server' });
     }
 
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${result.fileName}"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
     res.setHeader('X-License-Key', result.licenseKey);
 
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+    result.stream.pipe(res);
   }
 
   @Get('file-info/:productId')
