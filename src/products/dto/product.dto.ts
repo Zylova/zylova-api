@@ -1,6 +1,7 @@
 import {
   IsString,
   IsNumber,
+  IsBoolean,
   IsOptional,
   IsArray,
   IsEnum,
@@ -29,6 +30,8 @@ export class UpdateProductDto {
   @IsOptional() @IsArray() @IsString({ each: true }) features?: string[];
   @IsOptional() @IsEnum(ProductStatus) status?: ProductStatus;
   @IsOptional() @IsString() rejectReason?: string;
+  @IsOptional() @IsBoolean() exclusive?: boolean;
+  @IsOptional() @IsBoolean() sold?: boolean;
 }
 
 export class ProductQueryDto {

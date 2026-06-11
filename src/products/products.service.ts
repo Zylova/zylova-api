@@ -14,6 +14,8 @@ export class ProductsService {
   findAll(query?: ProductQueryDto) {
     const where: Record<string, unknown> = { status: 'approved' };
 
+    where.NOT = { exclusive: true, sold: true };
+
     if (query?.category) where.category = query.category;
     if (query?.search) {
       where.OR = [
@@ -25,6 +27,13 @@ export class ProductsService {
     return this.prisma.product.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async markAsSold(productId: string) {
+    return this.prisma.product.update({
+      where: { id: productId },
+      data: { sold: true },
     });
   }
 

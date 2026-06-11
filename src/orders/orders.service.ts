@@ -35,6 +35,14 @@ export class OrdersService {
 
   async create(dto: CreateOrderDto) {
     const downloadToken = uuid();
+
+    for (const item of dto.items) {
+      const product = await this.prisma.product.findUnique({ where: { id: item.id } });
+      if (product?.exclusive && product.sold) {
+        throw new BadRequestException(`"${product.name}" is an exclusive product and has already been sold.`);
+      }
+    }
+
     const order = await this.prisma.order.create({
       data: {
         email: dto.email,
@@ -49,6 +57,13 @@ export class OrdersService {
         status: 'paid',
       },
     });
+
+    for (const item of dto.items) {
+      const product = await this.prisma.product.findUnique({ where: { id: item.id } });
+      if (product?.exclusive) {
+        await this.prisma.product.update({ where: { id: item.id }, data: { sold: true } });
+      }
+    }
 
     this.events.notifyNewOrder(order);
     return order;

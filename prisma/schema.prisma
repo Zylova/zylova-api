@@ -63,6 +63,8 @@ model Product {
   highlighted    Boolean        @default(false)
   status         ProductStatus  @default(pending)
   rejectReason   String?
+  exclusive      Boolean        @default(false)
+  sold           Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime @updatedAt
 
