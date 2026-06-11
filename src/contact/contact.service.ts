@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
 import { CreateContactSubmissionDto } from './dto/contact.dto';
 import { EventsGateway } from '../events/events.gateway';
+import { sanitize, sanitizeOptional } from '../common/utils/sanitizer';
 
 @Injectable()
 export class ContactService {
@@ -15,7 +16,14 @@ export class ContactService {
 
   async submit(dto: CreateContactSubmissionDto) {
     const submission = await this.prisma.contactSubmission.create({
-      data: { ...dto, status: 'unread' },
+      data: {
+        name: sanitize(dto.name),
+        email: sanitize(dto.email),
+        company: sanitizeOptional(dto.company),
+        service: sanitizeOptional(dto.service),
+        message: sanitize(dto.message),
+        status: 'unread',
+      },
     });
 
     this.events.notifyNewContact(submission);

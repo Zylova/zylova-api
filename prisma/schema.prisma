@@ -178,3 +178,16 @@ model Review {
 
   @@map("reviews")
 }
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?
+  adminId   String?
+  adminEmail String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

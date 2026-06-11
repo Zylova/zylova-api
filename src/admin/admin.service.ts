@@ -9,6 +9,7 @@ import { ProductStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { EventsGateway } from '../events/events.gateway';
 import { PaymentService } from '../payment/payment.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AdminService {
@@ -18,6 +19,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
     private readonly paymentService: PaymentService,
+    private readonly auditService: AuditService,
   ) {}
 
   async listUsers(query?: string, role?: string, page = 1, limit = 10) {
@@ -86,6 +88,12 @@ export class AdminService {
       banned: updated.banned,
       createdAt: updated.createdAt,
     };
+    await this.auditService.log({
+      action: 'update_user_status',
+      entity: 'user',
+      entityId: id,
+      metadata: { role: data.role, banned: data.banned },
+    });
     this.events.notifyStatsUpdated(await this._computeStats());
     return result;
   }
@@ -123,10 +131,17 @@ export class AdminService {
     });
     if (!contact) throw new NotFoundException('Contact not found');
 
-    return this.prisma.contactSubmission.update({
+    const updated = await this.prisma.contactSubmission.update({
       where: { id },
       data: { status },
     });
+    await this.auditService.log({
+      action: 'update_contact_status',
+      entity: 'contact',
+      entityId: id,
+      metadata: { status },
+    });
+    return updated;
   }
 
   async updateOrderStatus(id: string, status: string, refundReason?: string) {
@@ -170,6 +185,12 @@ export class AdminService {
       }
     }
 
+    await this.auditService.log({
+      action: 'update_order_status',
+      entity: 'order',
+      entityId: id,
+      metadata: { status, refundReason },
+    });
     this.events.notifyOrderUpdated(updated);
     this.events.notifyStatsUpdated(await this._computeStats());
     return { order: updated };
@@ -192,6 +213,12 @@ export class AdminService {
     const updated = await this.prisma.product.update({
       where: { id },
       data: { status: status as ProductStatus, rejectReason },
+    });
+    await this.auditService.log({
+      action: 'update_product_status',
+      entity: 'product',
+      entityId: id,
+      metadata: { status, rejectReason },
     });
     this.events.notifyProductUpdated(updated);
     this.events.notifyStatsUpdated(await this._computeStats());
@@ -264,6 +291,11 @@ export class AdminService {
       created.push(user);
     }
 
+    await this.auditService.log({
+      action: 'reset_users',
+      entity: 'user',
+      metadata: { count: created.length },
+    });
     await this.notifyStats();
     return {
       message: `Deleted all users, created ${created.length} admin(s)`,

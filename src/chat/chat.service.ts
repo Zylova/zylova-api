@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
+import { sanitize, sanitizeOptional } from '../common/utils/sanitizer';
 
 @Injectable()
 export class ChatService {
@@ -20,9 +21,9 @@ export class ChatService {
       data: {
         sessionId: dto.sessionId,
         sender: dto.sender,
-        content: dto.content,
-        name: dto.name || 'Guest',
-        email: dto.email,
+        content: sanitize(dto.content),
+        name: sanitize(dto.name || 'Guest'),
+        email: sanitizeOptional(dto.email),
       },
     });
 

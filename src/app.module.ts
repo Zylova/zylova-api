@@ -17,6 +17,7 @@ import { DownloadModule } from './download/download.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { PaymentModule } from './payment/payment.module';
 import { StorageModule } from './storage/storage.module';
+import { AuditModule } from './audit/audit.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -39,6 +40,7 @@ import { AppController } from './app.controller';
     ReviewsModule,
     PaymentModule,
     StorageModule,
+    AuditModule,
   ],
   controllers: [AppController],
 })

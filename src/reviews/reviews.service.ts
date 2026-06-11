@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { sanitize, sanitizeOptional } from '../common/utils/sanitizer';
 
 @Injectable()
 export class ReviewsService {
@@ -20,10 +21,10 @@ export class ReviewsService {
     const review = await this.prisma.review.create({
       data: {
         productId: dto.productId,
-        email: dto.email,
-        name: dto.name,
+        email: sanitize(dto.email),
+        name: sanitize(dto.name),
         rating: dto.rating,
-        comment: dto.comment,
+        comment: sanitizeOptional(dto.comment),
         approved: false,
       },
     });

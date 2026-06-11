@@ -109,6 +109,13 @@ export class DownloadService {
   }
 
   async saveProductFile(productId: string, file: Express.Multer.File) {
+    if (file.size > 100 * 1024 * 1024) {
+      throw new BadRequestException('File size exceeds 100MB limit');
+    }
+    if (!file.originalname.endsWith('.zip')) {
+      throw new BadRequestException('Only .zip files are allowed');
+    }
+
     const existing = await this.prisma.productFile.findUnique({
       where: { productId },
     });

@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ContactService } from './contact.service';
 import {
   CreateContactSubmissionDto,
@@ -22,6 +23,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post()
   @ApiOperation({ summary: 'Submit a contact form' })
   submit(@Body() dto: CreateContactSubmissionDto) {
