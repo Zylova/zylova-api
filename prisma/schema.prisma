@@ -106,8 +106,12 @@ model Order {
   id            String      @id @default(uuid())
   email         String
   items         Json
+  subtotal      Float       @default(0)
+  taxRate       Float       @default(0)
+  taxAmount     Float       @default(0)
   total         Float
   status        String      @default("paid")
+  paymentMethod String      @default("stripe")
   downloadToken String      @unique
   stripeSession String?
   refundReason  String?
@@ -115,4 +119,17 @@ model Order {
   updatedAt     DateTime    @updatedAt
 
   @@map("orders")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  sessionId String
+  sender    String   @default("user") // "user" | "admin"
+  content   String
+  name      String   @default("Guest")
+  email     String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("chat_messages")
 }

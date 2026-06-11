@@ -1,37 +1,54 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { ProductStatus } from "@prisma/client";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { ProductStatus } from '@prisma/client';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsGateway,
+  ) {}
 
   async listUsers(query?: string, role?: string, page = 1, limit = 10) {
     const where: Record<string, unknown> = {};
 
     if (query) {
       where.OR = [
-        { name: { contains: query, mode: "insensitive" } },
-        { email: { contains: query, mode: "insensitive" } },
+        { name: { contains: query, mode: 'insensitive' } },
+        { email: { contains: query, mode: 'insensitive' } },
       ];
     }
-    if (role && (role === "admin" || role === "user")) {
+    if (role && (role === 'admin' || role === 'user')) {
       where.role = role.toUpperCase();
     }
 
     const total = await this.prisma.user.count({ where: where as any });
     const items = await this.prisma.user.findMany({
       where: where as any,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
-      select: { id: true, email: true, name: true, role: true, banned: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        banned: true,
+        createdAt: true,
+      },
     });
 
     const enriched = await Promise.all(
       items.map(async (user) => ({
         ...user,
-        ordersCount: await this.prisma.order.count({ where: { email: user.email } }),
+        ordersCount: await this.prisma.order.count({
+          where: { email: user.email },
+        }),
       })),
     );
 
@@ -45,14 +62,17 @@ export class AdminService {
 
   async updateUser(id: string, data: { role?: string; banned?: boolean }) {
     const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new NotFoundException('User not found');
 
     const updateData: Record<string, unknown> = {};
     if (data.role) updateData.role = data.role.toUpperCase();
     if (data.banned !== undefined) updateData.banned = data.banned;
 
-    const updated = await this.prisma.user.update({ where: { id }, data: updateData });
-    return {
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: updateData,
+    });
+    const result = {
       id: updated.id,
       email: updated.email,
       name: updated.name,
@@ -60,6 +80,8 @@ export class AdminService {
       banned: updated.banned,
       createdAt: updated.createdAt,
     };
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return result;
   }
 
   async listContacts(query?: string, status?: string, page = 1, limit = 10) {
@@ -67,19 +89,21 @@ export class AdminService {
 
     if (query) {
       where.OR = [
-        { name: { contains: query, mode: "insensitive" } },
-        { email: { contains: query, mode: "insensitive" } },
-        { message: { contains: query, mode: "insensitive" } },
+        { name: { contains: query, mode: 'insensitive' } },
+        { email: { contains: query, mode: 'insensitive' } },
+        { message: { contains: query, mode: 'insensitive' } },
       ];
     }
-    if (status && ["unread", "read", "replied"].includes(status)) {
+    if (status && ['unread', 'read', 'replied'].includes(status)) {
       where.status = status;
     }
 
-    const total = await this.prisma.contactSubmission.count({ where: where as any });
+    const total = await this.prisma.contactSubmission.count({
+      where: where as any,
+    });
     const items = await this.prisma.contactSubmission.findMany({
       where: where as any,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -88,42 +112,57 @@ export class AdminService {
   }
 
   async updateContactStatus(id: string, status: string) {
-    const contact = await this.prisma.contactSubmission.findUnique({ where: { id } });
-    if (!contact) throw new NotFoundException("Contact not found");
+    const contact = await this.prisma.contactSubmission.findUnique({
+      where: { id },
+    });
+    if (!contact) throw new NotFoundException('Contact not found');
 
-    return this.prisma.contactSubmission.update({ where: { id }, data: { status } });
+    return this.prisma.contactSubmission.update({
+      where: { id },
+      data: { status },
+    });
   }
 
   async updateOrderStatus(id: string, status: string, refundReason?: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundException("Order not found");
+    if (!order) throw new NotFoundException('Order not found');
 
     const transitions: Record<string, string[]> = {
-      pending: ["paid"],
-      paid: ["delivered", "refunded"],
-      delivered: ["completed", "refunded"],
+      pending: ['paid'],
+      paid: ['delivered', 'refunded'],
+      delivered: ['completed', 'refunded'],
       refunded: [],
       completed: [],
     };
     const allowed = transitions[order.status] || [];
     if (!allowed.includes(status)) {
       throw new BadRequestException(
-        `Cannot transition from "${order.status}" to "${status}". Allowed: ${allowed.join(", ")}`,
+        `Cannot transition from "${order.status}" to "${status}". Allowed: ${allowed.join(', ')}`,
       );
     }
 
     const updated = await this.prisma.order.update({
       where: { id },
-      data: { status, ...(status === "refunded" && refundReason ? { refundReason } : {}) },
+      data: {
+        status,
+        ...(status === 'refunded' && refundReason ? { refundReason } : {}),
+      },
     });
+    this.events.notifyOrderUpdated(updated);
+    this.events.notifyStatsUpdated(await this._computeStats());
     return { order: updated };
   }
 
   async updateProductStatus(id: string, status: string, rejectReason?: string) {
     const product = await this.prisma.product.findUnique({ where: { id } });
-    if (!product) throw new NotFoundException("Product not found");
+    if (!product) throw new NotFoundException('Product not found');
 
-    const validStatuses: ProductStatus[] = ["draft", "pending", "approved", "rejected"];
+    const validStatuses: ProductStatus[] = [
+      'draft',
+      'pending',
+      'approved',
+      'rejected',
+    ];
     if (!validStatuses.includes(status as ProductStatus)) {
       throw new BadRequestException(`Invalid product status: ${status}`);
     }
@@ -132,21 +171,32 @@ export class AdminService {
       where: { id },
       data: { status: status as ProductStatus, rejectReason },
     });
+    this.events.notifyProductUpdated(updated);
+    this.events.notifyStatsUpdated(await this._computeStats());
     return { product: updated };
   }
 
   async getStats() {
+    const stats = await this._computeStats();
+    this.events.notifyStatsUpdated(stats);
+    return stats;
+  }
+
+  private async _computeStats() {
     const [users, products, orders, revenueResult] = await Promise.all([
       this.prisma.user.count(),
-      this.prisma.product.count({ where: { status: "approved" } }),
+      this.prisma.product.count({ where: { status: 'approved' } }),
       this.prisma.order.count(),
-      this.prisma.order.aggregate({ _sum: { total: true }, where: { status: { not: "refunded" } } }),
+      this.prisma.order.aggregate({
+        _sum: { total: true },
+        where: { status: { not: 'refunded' } },
+      }),
     ]);
 
     const calcChange = (current: number, previous: number): string => {
-      if (previous === 0) return current > 0 ? "+100%" : "0";
+      if (previous === 0) return current > 0 ? '+100%' : '0';
       const pct = ((current - previous) / previous) * 100;
-      return `${pct >= 0 ? "+" : ""}${Math.round(pct)}%`;
+      return `${pct >= 0 ? '+' : ''}${Math.round(pct)}%`;
     };
 
     const revenue = revenueResult._sum.total || 0;
@@ -157,13 +207,21 @@ export class AdminService {
       orders,
       ordersChange: calcChange(orders, Math.max(0, orders - 3)),
       products,
-      productsChange: "0",
+      productsChange: '0',
       users,
       usersChange: calcChange(users, Math.max(0, users - 2)),
     };
   }
 
+  async notifyStats() {
+    const stats = await this._computeStats();
+    this.events.notifyStatsUpdated(stats);
+    return stats;
+  }
+
   async listNewsletterSubscribers() {
-    return this.prisma.newsletterSubscriber.findMany({ orderBy: { createdAt: "desc" } });
+    return this.prisma.newsletterSubscriber.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

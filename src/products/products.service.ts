@@ -1,38 +1,47 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateProductDto, UpdateProductDto, ProductQueryDto } from "./dto/product.dto";
-import { ProductStatus } from "@prisma/client";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductQueryDto,
+} from './dto/product.dto';
+import { ProductStatus } from '@prisma/client';
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll(query?: ProductQueryDto) {
-    const where: Record<string, unknown> = { status: "approved" };
+    const where: Record<string, unknown> = { status: 'approved' };
 
     if (query?.category) where.category = query.category;
     if (query?.search) {
       where.OR = [
-        { name: { contains: query.search, mode: "insensitive" } },
-        { description: { contains: query.search, mode: "insensitive" } },
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { description: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
-    return this.prisma.product.findMany({ where, orderBy: { createdAt: "desc" } });
+    return this.prisma.product.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   findAllAdmin() {
-    return this.prisma.product.findMany({ orderBy: { createdAt: "desc" } });
+    return this.prisma.product.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
   async findById(id: string) {
     const product = await this.prisma.product.findUnique({ where: { id } });
-    if (!product) throw new NotFoundException("Product not found");
+    if (!product) throw new NotFoundException('Product not found');
     return product;
   }
 
   create(dto: CreateProductDto) {
-    return this.prisma.product.create({ data: { ...dto, status: "pending" as ProductStatus } });
+    return this.prisma.product.create({
+      data: { ...dto, status: 'pending' },
+    });
   }
 
   async update(id: string, dto: UpdateProductDto) {
@@ -42,7 +51,10 @@ export class ProductsService {
 
   async updateStatus(id: string, status: ProductStatus, rejectReason?: string) {
     await this.findById(id);
-    return this.prisma.product.update({ where: { id }, data: { status, rejectReason } });
+    return this.prisma.product.update({
+      where: { id },
+      data: { status, rejectReason },
+    });
   }
 
   async remove(id: string) {

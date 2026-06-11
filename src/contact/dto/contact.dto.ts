@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsOptional, IsIn } from "class-validator";
+import { IsEmail, IsString, IsOptional, IsIn } from 'class-validator';
 
 export class CreateContactSubmissionDto {
   @IsString() name: string;
@@ -10,6 +10,6 @@ export class CreateContactSubmissionDto {
 
 export class UpdateContactStatusDto {
   @IsString()
-  @IsIn(["unread", "read", "replied"])
+  @IsIn(['unread', 'read', 'replied'])
   status: string;
 }

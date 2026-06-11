@@ -1,16 +1,19 @@
-import { Module } from "@nestjs/common";
-import { ThrottlerModule } from "@nestjs/throttler";
-import { ConfigModule } from "./config/config.module";
-import { PrismaModule } from "./prisma/prisma.module";
-import { AuthModule } from "./auth/auth.module";
-import { ProductsModule } from "./products/products.module";
-import { ServicesModule } from "./services/services.module";
-import { ContactModule } from "./contact/contact.module";
-import { NewsletterModule } from "./newsletter/newsletter.module";
-import { UploadModule } from "./upload/upload.module";
-import { OrdersModule } from "./orders/orders.module";
-import { AdminModule } from "./admin/admin.module";
-import { AppController } from "./app.controller";
+import { Module } from '@nestjs/common';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ConfigModule } from './config/config.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { ProductsModule } from './products/products.module';
+import { ServicesModule } from './services/services.module';
+import { ContactModule } from './contact/contact.module';
+import { NewsletterModule } from './newsletter/newsletter.module';
+import { UploadModule } from './upload/upload.module';
+import { OrdersModule } from './orders/orders.module';
+import { AdminModule } from './admin/admin.module';
+import { EventsModule } from './events/events.module';
+import { ChatModule } from './chat/chat.module';
+import { EmailModule } from './email/email.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -25,6 +28,9 @@ import { AppController } from "./app.controller";
     UploadModule,
     OrdersModule,
     AdminModule,
+    EventsModule,
+    ChatModule,
+    EmailModule,
   ],
   controllers: [AppController],
 })

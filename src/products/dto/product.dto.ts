@@ -1,5 +1,11 @@
-import { IsString, IsNumber, IsOptional, IsArray, IsEnum } from "class-validator";
-import { Category, ProductStatus } from "@prisma/client";
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  IsEnum,
+} from 'class-validator';
+import { Category, ProductStatus } from '@prisma/client';
 
 export class CreateProductDto {
   @IsString() name: string;

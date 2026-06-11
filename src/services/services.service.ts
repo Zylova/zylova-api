@@ -1,18 +1,22 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateServiceDto, UpdateServiceDto } from "./dto/service.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateServiceDto, UpdateServiceDto } from './dto/service.dto';
 
 @Injectable()
 export class ServicesService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll() {
-    return this.prisma.serviceEntity.findMany({ orderBy: { createdAt: "asc" } });
+    return this.prisma.serviceEntity.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   async findById(id: string) {
-    const service = await this.prisma.serviceEntity.findUnique({ where: { id } });
-    if (!service) throw new NotFoundException("Service not found");
+    const service = await this.prisma.serviceEntity.findUnique({
+      where: { id },
+    });
+    if (!service) throw new NotFoundException('Service not found');
     return service;
   }
 
