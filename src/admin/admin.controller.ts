@@ -3,13 +3,23 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+} from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { DownloadService } from '../download/download.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -20,7 +30,10 @@ import { Roles } from '../common/decorators/roles.decorator';
 @Roles('ADMIN')
 @ApiBearerAuth()
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly downloadService: DownloadService,
+  ) {}
 
   @Get('users')
   @ApiOperation({ summary: 'List users with search and pagination' })
@@ -114,5 +127,28 @@ export class AdminController {
   @ApiOperation({ summary: 'Delete all users and reseed admin accounts' })
   resetUsers(@Body() body: { emails: string[] }) {
     return this.adminService.resetUsers(body.emails);
+  }
+
+  @Post('products/:productId/file')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload product source code ZIP (admin)' })
+  uploadProductFile(
+    @Param('productId') productId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.downloadService.saveProductFile(productId, file);
+  }
+
+  @Get('products/:productId/file')
+  @ApiOperation({ summary: 'Get product file info (admin)' })
+  getProductFile(@Param('productId') productId: string) {
+    return this.downloadService.getProductFile(productId);
+  }
+
+  @Delete('products/:productId/file')
+  @ApiOperation({ summary: 'Delete product file (admin)' })
+  deleteProductFile(@Param('productId') productId: string) {
+    return this.downloadService.deleteProductFile(productId);
   }
 }

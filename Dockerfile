@@ -31,7 +31,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY prestart.js /app/prestart.js
 COPY seed.js /app/seed.js
 
-RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app
+RUN mkdir -p /app/uploads /app/products && chown -R appuser:appgroup /app
 
 EXPOSE 4000
 

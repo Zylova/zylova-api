@@ -222,7 +222,7 @@ export class AdminService {
 
   async listNewsletterSubscribers() {
     return this.prisma.newsletterSubscriber.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -231,14 +231,22 @@ export class AdminService {
     const created: Array<{ id: string; email: string }> = [];
 
     for (const email of emails) {
-      const hash = await bcrypt.hash("admin123", 10);
+      const hash = await bcrypt.hash('admin123', 10);
       const user = await this.prisma.user.create({
-        data: { email, password: hash, name: email.split("@")[0], role: "ADMIN" },
+        data: {
+          email,
+          password: hash,
+          name: email.split('@')[0],
+          role: 'ADMIN',
+        },
       });
       created.push(user);
     }
 
     await this.notifyStats();
-    return { message: `Deleted all users, created ${created.length} admin(s)`, users: created.map((u) => u.email) };
+    return {
+      message: `Deleted all users, created ${created.length} admin(s)`,
+      users: created.map((u) => u.email),
+    };
   }
 }

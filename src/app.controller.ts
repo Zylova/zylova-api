@@ -9,7 +9,11 @@ export class AppController {
 
   @Get('health')
   health(): { status: string; version: string; timestamp: string } {
-    return { status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() };
+    return {
+      status: 'ok',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   @Get('db-check')

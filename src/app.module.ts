@@ -13,6 +13,7 @@ import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
 import { ChatModule } from './chat/chat.module';
 import { EmailModule } from './email/email.module';
+import { DownloadModule } from './download/download.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -31,6 +32,7 @@ import { AppController } from './app.controller';
     EventsModule,
     ChatModule,
     EmailModule,
+    DownloadModule,
   ],
   controllers: [AppController],
 })

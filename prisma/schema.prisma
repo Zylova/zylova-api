@@ -124,7 +124,7 @@ model Order {
 model ChatMessage {
   id        String   @id @default(uuid())
   sessionId String
-  sender    String   @default("user") // "user" | "admin"
+  sender    String   @default("user")
   content   String
   name      String   @default("Guest")
   email     String?
@@ -132,4 +132,31 @@ model ChatMessage {
   createdAt DateTime @default(now())
 
   @@map("chat_messages")
+}
+
+model ProductFile {
+  id        String   @id @default(uuid())
+  productId String   @unique
+  fileName  String
+  fileSize  Int
+  filePath  String
+  version   String   @default("1.0.0")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("product_files")
+}
+
+model DownloadLog {
+  id         String   @id @default(uuid())
+  token      String
+  productId  String
+  email      String
+  ip         String?
+  downloaded Boolean  @default(false)
+  downloadedAt DateTime?
+  licenseKey String   @unique
+  createdAt  DateTime @default(now())
+
+  @@map("download_logs")
 }
