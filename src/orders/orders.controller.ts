@@ -20,9 +20,22 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create an order after successful payment' })
+  @ApiOperation({
+    summary: 'Create an order (status: pending until payment confirmed)',
+  })
   create(@Body() dto: CreateOrderDto) {
     return this.ordersService.create(dto);
+  }
+
+  @Post('confirm')
+  @ApiOperation({ summary: 'Confirm payment by download token' })
+  confirmPayment(
+    @Body() dto: { downloadToken: string; stripeSession?: string },
+  ) {
+    return this.ordersService.confirmPayment(
+      dto.downloadToken,
+      dto.stripeSession,
+    );
   }
 
   @Get('download/:token')

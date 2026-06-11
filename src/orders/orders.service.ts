@@ -42,11 +42,16 @@ export class OrdersService {
 
   async create(dto: CreateOrderDto) {
     const downloadToken = uuid();
+    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     for (const item of dto.items) {
-      const product = await this.prisma.product.findUnique({ where: { id: item.id } });
+      const product = await this.prisma.product.findUnique({
+        where: { id: item.id },
+      });
       if (product?.exclusive && product.sold) {
-        throw new BadRequestException(`"${product.name}" is an exclusive product and has already been sold.`);
+        throw new BadRequestException(
+          `"${product.name}" is an exclusive product and has already been sold.`,
+        );
       }
     }
 
@@ -61,32 +66,64 @@ export class OrdersService {
         paymentMethod: dto.paymentMethod,
         downloadToken,
         stripeSession: dto.stripeSession,
-        status: 'paid',
+        status: 'pending',
+        tokenExpiresAt,
       },
     });
 
-    for (const item of dto.items) {
-      const product = await this.prisma.product.findUnique({ where: { id: item.id } });
+    return order;
+  }
+
+  async confirmPayment(downloadToken: string, stripeSession?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { downloadToken },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status !== 'pending') {
+      throw new BadRequestException(
+        `Cannot confirm payment: order status is "${order.status}"`,
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { downloadToken },
+      data: { status: 'paid', stripeSession },
+    });
+
+    for (const item of updated.items as Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity: number;
+    }>) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: item.id },
+      });
       if (product?.exclusive) {
-        await this.prisma.product.update({ where: { id: item.id }, data: { sold: true } });
+        await this.prisma.product.update({
+          where: { id: item.id },
+          data: { sold: true },
+        });
       }
     }
 
-    this.events.notifyNewOrder(order);
+    this.events.notifyNewOrder(updated);
 
     try {
       await this.emailService.sendOrderConfirmation({
-        email: order.email,
-        downloadToken: order.downloadToken,
-        items: order.items as Array<{ name: string; price: number }>,
-        total: order.total,
-        paymentMethod: order.paymentMethod,
+        email: updated.email,
+        downloadToken: updated.downloadToken,
+        items: updated.items as Array<{ name: string; price: number }>,
+        total: updated.total,
+        paymentMethod: updated.paymentMethod,
       });
     } catch (e) {
-      this.logger.warn(`Failed to send order confirmation email: ${(e as Error).message}`);
+      this.logger.warn(
+        `Failed to send order confirmation email: ${(e as Error).message}`,
+      );
     }
 
-    return order;
+    return updated;
   }
 
   async findByDownloadToken(token: string) {

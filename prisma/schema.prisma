@@ -112,11 +112,12 @@ model Order {
   taxRate       Float       @default(0)
   taxAmount     Float       @default(0)
   total         Float
-  status        String      @default("paid")
-  paymentMethod String      @default("stripe")
-  downloadToken String      @unique
-  stripeSession String?
-  refundReason  String?
+  status          String      @default("pending")
+  tokenExpiresAt  DateTime?
+  paymentMethod   String      @default("stripe")
+  downloadToken   String      @unique
+  stripeSession   String?
+  refundReason    String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

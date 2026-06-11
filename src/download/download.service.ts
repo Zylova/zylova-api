@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { StorageService } from "../storage/storage.service";
-import * as crypto from "crypto";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class DownloadService {
@@ -13,17 +18,32 @@ export class DownloadService {
   ) {}
 
   async getDownloadInfo(token: string) {
-    const order = await this.prisma.order.findUnique({ where: { downloadToken: token } });
-    if (!order) throw new NotFoundException("Invalid download token");
+    const order = await this.prisma.order.findUnique({
+      where: { downloadToken: token },
+    });
+    if (!order) throw new NotFoundException('Invalid download token');
+    if (order.status !== 'paid')
+      throw new BadRequestException('Payment not confirmed yet');
+    if (order.tokenExpiresAt && new Date() > new Date(order.tokenExpiresAt)) {
+      throw new BadRequestException('Download token has expired');
+    }
 
     const items = order.items as Array<{ id: string; name: string }>;
-    const products: Array<{ id: string; name: string; hasFile: boolean; downloaded: boolean; licenseKey: string | null }> = [];
+    const products: Array<{
+      id: string;
+      name: string;
+      hasFile: boolean;
+      downloaded: boolean;
+      licenseKey: string | null;
+    }> = [];
 
     for (const item of items) {
-      const productFile = await this.prisma.productFile.findUnique({ where: { productId: item.id } });
+      const productFile = await this.prisma.productFile.findUnique({
+        where: { productId: item.id },
+      });
       const existingLog = await this.prisma.downloadLog.findFirst({
         where: { token, productId: item.id },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
       });
 
       products.push({
@@ -39,23 +59,36 @@ export class DownloadService {
   }
 
   async downloadProduct(token: string, productId: string, ip?: string) {
-    const order = await this.prisma.order.findUnique({ where: { downloadToken: token } });
-    if (!order) throw new NotFoundException("Invalid download token");
+    const order = await this.prisma.order.findUnique({
+      where: { downloadToken: token },
+    });
+    if (!order) throw new NotFoundException('Invalid download token');
+    if (order.status !== 'paid')
+      throw new BadRequestException('Payment not confirmed yet');
+    if (order.tokenExpiresAt && new Date() > new Date(order.tokenExpiresAt)) {
+      throw new BadRequestException('Download token has expired');
+    }
 
-    const productFile = await this.prisma.productFile.findUnique({ where: { productId } });
-    if (!productFile) throw new NotFoundException("Product file not available");
+    const productFile = await this.prisma.productFile.findUnique({
+      where: { productId },
+    });
+    if (!productFile) throw new NotFoundException('Product file not available');
 
-    const existingLog = await this.prisma.downloadLog.findFirst({ where: { token, productId } });
+    const existingLog = await this.prisma.downloadLog.findFirst({
+      where: { token, productId },
+    });
     if (existingLog?.downloaded) {
-      throw new BadRequestException("This product has already been downloaded. Contact support for re-download.");
+      throw new BadRequestException(
+        'This product has already been downloaded. Contact support for re-download.',
+      );
     }
 
     const licenseKey = [
-      "ZYL",
-      crypto.randomBytes(4).toString("hex").toUpperCase(),
-      crypto.randomBytes(4).toString("hex").toUpperCase(),
-      crypto.randomBytes(2).toString("hex").toUpperCase(),
-    ].join("-");
+      'ZYL',
+      crypto.randomBytes(4).toString('hex').toUpperCase(),
+      crypto.randomBytes(4).toString('hex').toUpperCase(),
+      crypto.randomBytes(2).toString('hex').toUpperCase(),
+    ].join('-');
 
     await this.prisma.downloadLog.create({
       data: {
@@ -76,7 +109,9 @@ export class DownloadService {
   }
 
   async saveProductFile(productId: string, file: Express.Multer.File) {
-    const existing = await this.prisma.productFile.findUnique({ where: { productId } });
+    const existing = await this.prisma.productFile.findUnique({
+      where: { productId },
+    });
     if (existing) {
       await this.storage.delete(existing.filePath);
       await this.prisma.productFile.delete({ where: { id: existing.id } });
@@ -91,14 +126,19 @@ export class DownloadService {
   }
 
   async getProductFile(productId: string) {
-    const productFile = await this.prisma.productFile.findUnique({ where: { productId } });
-    if (!productFile) throw new NotFoundException("No file uploaded for this product");
+    const productFile = await this.prisma.productFile.findUnique({
+      where: { productId },
+    });
+    if (!productFile)
+      throw new NotFoundException('No file uploaded for this product');
     return productFile;
   }
 
   async deleteProductFile(productId: string) {
-    const productFile = await this.prisma.productFile.findUnique({ where: { productId } });
-    if (!productFile) throw new NotFoundException("No file to delete");
+    const productFile = await this.prisma.productFile.findUnique({
+      where: { productId },
+    });
+    if (!productFile) throw new NotFoundException('No file to delete');
     await this.storage.delete(productFile.filePath);
     await this.prisma.productFile.delete({ where: { id: productFile.id } });
   }

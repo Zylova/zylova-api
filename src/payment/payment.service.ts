@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import Stripe from 'stripe';
 
 @Injectable()
@@ -19,11 +19,16 @@ export class PaymentService {
         }
 
         const stripe = new Stripe(secretKey);
-        const session = await stripe.checkout.sessions.retrieve(order.stripeSession);
+        const session = await stripe.checkout.sessions.retrieve(
+          order.stripeSession,
+        );
 
         const paymentIntentId = session.payment_intent as string;
         if (!paymentIntentId) {
-          return { refunded: false, error: 'No PaymentIntent found for this session' };
+          return {
+            refunded: false,
+            error: 'No PaymentIntent found for this session',
+          };
         }
 
         const refund = await stripe.refunds.create({
@@ -39,11 +44,15 @@ export class PaymentService {
         );
         return {
           refunded: false,
-          error: 'Manual refund required — please process via VNPAY/MoMo merchant portal',
+          error:
+            'Manual refund required — please process via VNPAY/MoMo merchant portal',
         };
       }
 
-      return { refunded: false, error: `Unsupported payment method: ${order.paymentMethod}` };
+      return {
+        refunded: false,
+        error: `Unsupported payment method: ${order.paymentMethod}`,
+      };
     } catch (error) {
       const message = (error as Error).message;
       this.logger.error(`Refund failed for order ${order.id}: ${message}`);
@@ -60,6 +69,52 @@ export class PaymentService {
     const result = await this.refundOrder(order);
     if (!result.refunded) {
       throw new Error(result.error || 'Refund failed');
+    }
+  }
+
+  handleStripeWebhook(
+    signature: string,
+    body: Buffer,
+  ): { received: boolean; downloadToken?: string; expired?: boolean } {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      this.logger.warn(
+        'STRIPE_WEBHOOK_SECRET not configured — skipping signature verification',
+      );
+      return { received: true };
+    }
+
+    try {
+      const event = Stripe.webhooks.constructEvent(
+        body,
+        signature,
+        webhookSecret,
+      );
+
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as {
+          metadata?: { downloadToken?: string };
+        };
+        const downloadToken = session?.metadata?.downloadToken;
+        if (downloadToken) {
+          return { received: true, downloadToken };
+        }
+      }
+
+      if (event.type === 'checkout.session.expired') {
+        const session = event.data.object as {
+          metadata?: { downloadToken?: string };
+        };
+        const downloadToken = session?.metadata?.downloadToken;
+        return { received: true, expired: true, downloadToken };
+      }
+
+      return { received: true };
+    } catch (err) {
+      this.logger.error(
+        `Stripe webhook signature verification failed: ${(err as Error).message}`,
+      );
+      throw new BadRequestException('Invalid webhook signature');
     }
   }
 }

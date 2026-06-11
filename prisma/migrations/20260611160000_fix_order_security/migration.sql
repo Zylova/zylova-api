@@ -1,0 +1,2 @@
+ALTER TABLE "orders" ALTER COLUMN "status" SET DEFAULT 'pending';
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "tokenExpiresAt" TIMESTAMP(3);
