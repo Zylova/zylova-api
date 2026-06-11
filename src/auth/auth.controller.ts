@@ -8,6 +8,7 @@ import {
   Res,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -26,12 +27,14 @@ import type { Request, Response } from 'express';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('login')
   @ApiOperation({ summary: 'Login with email and password' })
   login(@Body() dto: LoginDto) {
@@ -46,12 +49,14 @@ export class AuthController {
     return this.authService.getProfile(userId);
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request a password reset email' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password with token' })
   resetPassword(@Body() dto: ResetPasswordDto) {
