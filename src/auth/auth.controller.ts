@@ -63,6 +63,13 @@ export class AuthController {
     return this.authService.resetPassword(dto.token, dto.password);
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token' })
+  refresh(@Body() dto: { refreshToken: string }) {
+    return this.authService.refresh(dto.refreshToken);
+  }
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Login with Google' })
@@ -80,7 +87,7 @@ export class AuthController {
     );
     const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000';
     res.redirect(
-      `${frontendUrl}/auth/callback?token=${result.token}&user=${encodeURIComponent(JSON.stringify(result.user))}`,
+      `${frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&user=${encodeURIComponent(JSON.stringify(result.user))}`,
     );
   }
 
@@ -101,7 +108,7 @@ export class AuthController {
     );
     const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000';
     res.redirect(
-      `${frontendUrl}/auth/callback?token=${result.token}&user=${encodeURIComponent(JSON.stringify(result.user))}`,
+      `${frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&user=${encodeURIComponent(JSON.stringify(result.user))}`,
     );
   }
 }

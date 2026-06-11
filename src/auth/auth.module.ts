@@ -14,9 +14,6 @@ import { FacebookStrategy } from './facebook.strategy';
       secret:
         process.env.JWT_SECRET ||
         'super-secret-jwt-key-change-in-production-2026',
-      signOptions: {
-        expiresIn: (process.env.JWT_EXPIRATION || '7d') as `${number}d`,
-      },
     }),
   ],
   controllers: [AuthController],

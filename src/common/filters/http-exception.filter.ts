@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import {
   ExceptionFilter,
   Catch,
@@ -26,6 +27,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getResponse()
         : 'Internal server error';
+
+    if (process.env.SENTRY_DSN) {
+      Sentry.captureException(exception);
+    }
 
     this.logger.error(
       `HTTP ${status} - ${request.method} ${request.url}`,

@@ -18,6 +18,8 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { PaymentModule } from './payment/payment.module';
 import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './audit/audit.module';
+import { WishlistModule } from './wishlist/wishlist.module';
+import { CouponModule } from './coupon/coupon.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -41,6 +43,8 @@ import { AppController } from './app.controller';
     PaymentModule,
     StorageModule,
     AuditModule,
+    WishlistModule,
+    CouponModule,
   ],
   controllers: [AppController],
 })

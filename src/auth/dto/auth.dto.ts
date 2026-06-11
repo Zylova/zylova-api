@@ -1,9 +1,17 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsString, MinLength, Matches } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail() email: string;
   @IsString() @MinLength(2) name: string;
-  @IsString() @MinLength(6) password: string;
+  @IsString()
+  @Matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/,
+    {
+      message:
+        'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+    },
+  )
+  password: string;
 }
 
 export class LoginDto {
@@ -17,5 +25,13 @@ export class ForgotPasswordDto {
 
 export class ResetPasswordDto {
   @IsString() token: string;
-  @IsString() @MinLength(8) password: string;
+  @IsString()
+  @Matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/,
+    {
+      message:
+        'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+    },
+  )
+  password: string;
 }

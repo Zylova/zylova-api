@@ -22,6 +22,7 @@ describe('AuthService', () => {
     email: 'test@test.com',
     name: 'Test User',
     password: 'hashed-password',
+    refreshToken: 'hashed-password',
     role: 'USER' as const,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
@@ -39,6 +40,7 @@ describe('AuthService', () => {
 
   const mockJwtService = {
     sign: jest.fn().mockReturnValue('jwt-token'),
+    verify: jest.fn(),
   };
 
   const mockEmailService = {
@@ -77,7 +79,8 @@ describe('AuthService', () => {
         password: 'password123',
       });
 
-      expect(result.token).toBe('jwt-token');
+      expect(result.accessToken).toBe('jwt-token');
+      expect(result.refreshToken).toBe('jwt-token');
       expect(result.user.email).toBe('test@test.com');
       expect(result.user).not.toHaveProperty('password');
     });
@@ -104,7 +107,8 @@ describe('AuthService', () => {
         password: 'password123',
       });
 
-      expect(result.token).toBe('jwt-token');
+      expect(result.accessToken).toBe('jwt-token');
+      expect(result.refreshToken).toBe('jwt-token');
       expect(result.user.email).toBe('test@test.com');
       expect(result.user).not.toHaveProperty('password');
     });
@@ -125,6 +129,54 @@ describe('AuthService', () => {
       await expect(
         service.login({ email: 'test@test.com', password: 'wrong' }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('refresh', () => {
+    beforeEach(() => {
+      const bcryptModule = jest.requireMock('bcrypt');
+      bcryptModule.compare.mockResolvedValue(true);
+    });
+
+    it('should return new token pair', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'uuid-1',
+        email: 'test@test.com',
+        role: 'USER',
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockJwtService.sign.mockReturnValue('new-jwt-token');
+
+      const result = await service.refresh('valid-refresh-token');
+
+      expect(result.accessToken).toBe('new-jwt-token');
+      expect(result.refreshToken).toBe('new-jwt-token');
+    });
+
+    it('should throw UnauthorizedException for invalid token', async () => {
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      await expect(service.refresh('invalid-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should throw UnauthorizedException if user has no refresh token', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'uuid-1',
+        email: 'test@test.com',
+        role: 'USER',
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        refreshToken: null,
+      });
+
+      await expect(service.refresh('valid-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 

@@ -30,8 +30,9 @@ export class AuthService {
       data: { email: dto.email, name: dto.name, password: hashedPassword },
     });
 
+    const tokens = await this.generateTokenPair(user.id, user.email, user.role);
     return {
-      token: this.generateToken(user.id, user.email, user.role),
+      ...tokens,
       user: this.sanitize(user),
     };
   }
@@ -51,10 +52,35 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
+    const tokens = await this.generateTokenPair(user.id, user.email, user.role);
     return {
-      token: this.generateToken(user.id, user.email, user.role),
+      ...tokens,
       user: this.sanitize(user),
     };
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken);
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+      if (!user || !user.refreshToken)
+        throw new UnauthorizedException('Invalid refresh token');
+
+      const valid = await bcrypt.compare(refreshToken, user.refreshToken);
+      if (!valid)
+        throw new UnauthorizedException('Invalid refresh token');
+
+      const tokens = await this.generateTokenPair(
+        user.id,
+        user.email,
+        user.role,
+      );
+      return tokens;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 
   async getProfile(userId: string) {
@@ -159,14 +185,25 @@ export class AuthService {
 
     if (user.banned) throw new UnauthorizedException('Account is banned');
 
+    const tokens = await this.generateTokenPair(user.id, user.email, user.role);
     return {
-      token: this.generateToken(user.id, user.email, user.role),
+      ...tokens,
       user: this.sanitize(user),
     };
   }
 
-  private generateToken(id: string, email: string, role: string) {
-    return this.jwtService.sign({ sub: id, email, role });
+  private async generateTokenPair(id: string, email: string, role: string) {
+    const payload = { sub: id, email, role };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    const refreshHash = await bcrypt.hash(refreshToken, 10);
+    await this.prisma.user.update({
+      where: { id },
+      data: { refreshToken: refreshHash },
+    });
+
+    return { accessToken, refreshToken };
   }
 
   private sanitize(user: {
