@@ -14,6 +14,8 @@ import { EventsModule } from './events/events.module';
 import { ChatModule } from './chat/chat.module';
 import { EmailModule } from './email/email.module';
 import { DownloadModule } from './download/download.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { PaymentModule } from './payment/payment.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -33,6 +35,8 @@ import { AppController } from './app.controller';
     ChatModule,
     EmailModule,
     DownloadModule,
+    ReviewsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
 })

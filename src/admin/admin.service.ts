@@ -2,17 +2,22 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { EventsGateway } from '../events/events.gateway';
+import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly paymentService: PaymentService,
   ) {}
 
   async listUsers(query?: string, role?: string, page = 1, limit = 10) {
@@ -149,6 +154,22 @@ export class AdminService {
         ...(status === 'refunded' && refundReason ? { refundReason } : {}),
       },
     });
+
+    if (status === 'refunded') {
+      try {
+        await this.paymentService.processRefund({
+          id: order.id,
+          stripeSession: order.stripeSession,
+          paymentMethod: order.paymentMethod,
+          total: order.total,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Payment gateway refund failed for order ${order.id}: ${(err as Error).message}`,
+        );
+      }
+    }
+
     this.events.notifyOrderUpdated(updated);
     this.events.notifyStatsUpdated(await this._computeStats());
     return { order: updated };

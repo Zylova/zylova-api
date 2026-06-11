@@ -162,3 +162,18 @@ model DownloadLog {
 
   @@map("download_logs")
 }
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  userId    String?
+  email     String
+  name      String
+  rating    Int
+  comment   String?
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
+}

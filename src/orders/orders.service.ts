@@ -2,10 +2,13 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { v4 as uuid } from 'uuid';
 import { EventsGateway } from '../events/events.gateway';
+import { EmailService } from '../email/email.service';
+import { PaymentService } from '../payment/payment.service';
 
 export class CreateOrderDto {
   email: string;
@@ -28,9 +31,13 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly emailService: EmailService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   async create(dto: CreateOrderDto) {
@@ -66,6 +73,19 @@ export class OrdersService {
     }
 
     this.events.notifyNewOrder(order);
+
+    try {
+      await this.emailService.sendOrderConfirmation({
+        email: order.email,
+        downloadToken: order.downloadToken,
+        items: order.items as Array<{ name: string; price: number }>,
+        total: order.total,
+        paymentMethod: order.paymentMethod,
+      });
+    } catch (e) {
+      this.logger.warn(`Failed to send order confirmation email: ${(e as Error).message}`);
+    }
+
     return order;
   }
 
@@ -106,6 +126,21 @@ export class OrdersService {
         ...(status === 'refunded' && refundReason ? { refundReason } : {}),
       },
     });
+
+    if (status === 'refunded') {
+      try {
+        await this.paymentService.processRefund({
+          id: order.id,
+          stripeSession: order.stripeSession,
+          paymentMethod: order.paymentMethod,
+          total: order.total,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Payment gateway refund failed for order ${order.id}: ${(err as Error).message}`,
+        );
+      }
+    }
 
     this.events.notifyOrderUpdated(updated);
     return updated;
