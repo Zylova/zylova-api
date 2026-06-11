@@ -35,7 +35,7 @@ export class WishlistService {
 
     const exists = user.wishlist.includes(productId);
     const wishlist = exists
-      ? user.wishlist.filter(id => id !== productId)
+      ? user.wishlist.filter((id) => id !== productId)
       : [...user.wishlist, productId];
 
     await this.prisma.user.update({

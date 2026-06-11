@@ -1,15 +1,13 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-} from '@nestjs/common';
+import * as crypto from 'crypto';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { TwoFactorService } from './two-factor.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { sanitize } from '../common/utils/sanitizer';
 
 @Injectable()
 export class AuthService {
@@ -17,18 +15,33 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly twoFactorService: TwoFactorService,
   ) {}
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
-    if (existing) throw new ConflictException('Email already registered');
+
+    if (existing) {
+      // Return opaque success to prevent email enumeration
+      return { message: 'Registration successful. Please check your email to verify your account.' };
+    }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
-      data: { email: dto.email, name: dto.name, password: hashedPassword },
+      data: { email: dto.email, name: sanitize(dto.name), password: hashedPassword },
     });
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { verificationToken, verificationTokenExpires },
+    });
+
+    await this.emailService.sendVerificationEmail(dto.email, verificationToken);
 
     const tokens = await this.generateTokenPair(user.id, user.email, user.role);
     return {
@@ -37,26 +50,127 @@ export class AuthService {
     };
   }
 
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        verificationToken: token,
+        verificationTokenExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      // Check if token exists but is expired
+      const expired = await this.prisma.user.findFirst({
+        where: { verificationToken: token },
+      });
+      if (expired) {
+        await this.prisma.user.update({
+          where: { id: expired.id },
+          data: { verificationToken: null, verificationTokenExpires: null },
+        });
+        throw new BadRequestException('Verification token has expired');
+      }
+      throw new BadRequestException('Invalid verification token');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        verificationToken: null,
+        verificationTokenExpires: null,
+      },
+    });
+
+    return { message: 'Email verified' };
+  }
+
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    if (user.banned) throw new UnauthorizedException('Account is banned');
 
-    if (!user.password)
-      throw new UnauthorizedException(
-        'This account uses social login. Please sign in with Google or Facebook.',
-      );
+    // Generic check — never reveal whether email exists, password is wrong, or account is banned
+    if (!user || !user.password || !(await bcrypt.compare(dto.password, user.password)) || user.banned) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
 
-    const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (user.twoFactorEnabled) {
+      return {
+        requiresTwoFactor: true,
+        userId: user.id,
+        message: '2FA code required',
+      };
+    }
 
     const tokens = await this.generateTokenPair(user.id, user.email, user.role);
     return {
       ...tokens,
       user: this.sanitize(user),
     };
+  }
+
+  async loginWith2fa(userId: string, twoFactorCode: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.twoFactorSecret || !user.twoFactorEnabled) {
+      throw new UnauthorizedException('2FA not configured');
+    }
+
+    if (
+      user.twoFactorLockedUntil &&
+      new Date() < new Date(user.twoFactorLockedUntil)
+    ) {
+      const remaining = Math.ceil(
+        (new Date(user.twoFactorLockedUntil).getTime() - Date.now()) / 60000,
+      );
+      throw new BadRequestException(
+        `Too many attempts. Try again in ${remaining} minute${remaining !== 1 ? 's' : ''}.`,
+      );
+    }
+
+    if (
+      user.twoFactorLockedUntil &&
+      new Date() >= new Date(user.twoFactorLockedUntil)
+    ) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { twoFactorFailedAttempts: 0, twoFactorLockedUntil: null },
+      });
+    }
+
+    const valid = this.twoFactorService.verifyToken(
+      user.twoFactorSecret,
+      twoFactorCode,
+    );
+    if (!valid) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { twoFactorFailedAttempts: { increment: 1 } },
+      });
+
+      const updated = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { twoFactorFailedAttempts: true },
+      });
+
+      if (updated && updated.twoFactorFailedAttempts >= 5) {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            twoFactorLockedUntil: new Date(Date.now() + 30 * 60 * 1000),
+          },
+        });
+      }
+
+      throw new UnauthorizedException('Invalid 2FA code');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorFailedAttempts: 0, twoFactorLockedUntil: null },
+    });
+
+    return this.generateTokenPair(user.id, user.email, user.role);
   }
 
   async refresh(refreshToken: string) {
@@ -69,8 +183,7 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
 
       const valid = await bcrypt.compare(refreshToken, user.refreshToken);
-      if (!valid)
-        throw new UnauthorizedException('Invalid refresh token');
+      if (!valid) throw new UnauthorizedException('Invalid refresh token');
 
       const tokens = await this.generateTokenPair(
         user.id,

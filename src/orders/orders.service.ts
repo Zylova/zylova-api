@@ -71,6 +71,7 @@ export class OrdersService {
       },
     });
 
+    this.events.notifyNewOrder(order);
     return order;
   }
 
@@ -181,5 +182,14 @@ export class OrdersService {
 
     this.events.notifyOrderUpdated(updated);
     return updated;
+  }
+
+  async updateInternalNote(orderId: string, note: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found');
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { internalNote: note },
+    });
   }
 }

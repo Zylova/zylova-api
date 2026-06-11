@@ -28,14 +28,21 @@ export class DownloadController {
     @Res() res: Response,
   ) {
     const ip = req.ip;
-    const result = await this.downloadService.downloadProduct(token, productId, ip);
+    const result = await this.downloadService.downloadProduct(
+      token,
+      productId,
+      ip,
+    );
 
     if (!result.stream) {
       return res.status(404).json({ error: 'File not found on server' });
     }
 
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.fileName}"`,
+    );
     res.setHeader('X-License-Key', result.licenseKey);
 
     result.stream.pipe(res);

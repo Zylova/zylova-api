@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CouponService } from './coupon.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -19,7 +20,8 @@ export class CouponController {
   constructor(private readonly couponService: CouponService) {}
 
   @Post('validate')
-  @ApiOperation({ summary: 'Validate coupon code' })
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @ApiOperation({ summary: 'Validate coupon code (rate limited: 5/min)' })
   validate(@Body() dto: { code: string; amount: number }) {
     return this.couponService.validate(dto.code, dto.amount);
   }

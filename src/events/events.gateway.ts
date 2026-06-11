@@ -6,7 +6,16 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+
+interface JwtPayload {
+  sub: string;
+  email: string;
+  role: string;
+  [key: string]: unknown;
+}
 
 @WebSocketGateway({
   cors: {
@@ -22,7 +31,61 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(EventsGateway.name);
   private adminSockets = new Set<string>();
 
+  private readonly rateLimiter = new RateLimiterMemory({
+    points: 30,
+    duration: 10,
+    keyPrefix: 'ws',
+  });
+
+  constructor(private readonly jwtService: JwtService) {}
+
+  private async checkRateLimit(client: Socket): Promise<boolean> {
+    try {
+      await this.rateLimiter.consume(client.id);
+      return true;
+    } catch {
+      client.emit('rateLimit', { message: 'Too many messages. Please slow down.' });
+      return false;
+    }
+  }
+
   handleConnection(client: Socket) {
+    const namespace = client.nsp.name;
+
+    if (namespace === '/admin-room') {
+      const token = client.handshake.auth?.token as string | undefined;
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+      try {
+        const decoded = this.jwtService.verify<JwtPayload>(token);
+        if (decoded.role !== 'ADMIN') {
+          client.disconnect();
+          return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        client.data.user = decoded;
+      } catch {
+        client.disconnect();
+        return;
+      }
+    }
+
+    if (namespace === '/order-tracking') {
+      const token = client.handshake.auth?.token as string | undefined;
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+      try {
+        this.jwtService.verify(token);
+      } catch {
+        client.disconnect();
+        return;
+      }
+    }
+
     this.logger.log(`Client connected: ${client.id}`);
   }
 
@@ -32,25 +95,29 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join-admin')
-  handleJoinAdmin(client: Socket) {
+  async handleJoinAdmin(client: Socket) {
+    if (!(await this.checkRateLimit(client))) return;
     this.adminSockets.add(client.id);
-    void client.join('admin-room');
+    await client.join('admin-room');
     this.logger.log(`Admin joined: ${client.id}`);
   }
 
   @SubscribeMessage('join-order-tracking')
-  handleJoinOrderTracking(client: Socket, email: string) {
-    void client.join(`order-${email}`);
+  async handleJoinOrderTracking(client: Socket, email: string) {
+    if (!(await this.checkRateLimit(client))) return;
+    await client.join(`order-${email}`);
   }
 
   @SubscribeMessage('join-chat')
-  handleJoinChat(client: Socket, sessionId: string) {
-    void client.join(`chat-${sessionId}`);
+  async handleJoinChat(client: Socket, sessionId: string) {
+    if (!(await this.checkRateLimit(client))) return;
+    await client.join(`chat-${sessionId}`);
   }
 
   @SubscribeMessage('join-admin-chat')
-  handleJoinAdminChat(client: Socket) {
-    void client.join('admin-chat-room');
+  async handleJoinAdminChat(client: Socket) {
+    if (!(await this.checkRateLimit(client))) return;
+    await client.join('admin-chat-room');
   }
 
   notifyNewOrder(order: Record<string, any>) {
@@ -64,6 +131,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   notifyNewContact(contact: Record<string, any>) {
     void this.server.to('admin-room').emit('new-contact', contact);
+  }
+
+  notifyNewTicket(ticket: Record<string, any>) {
+    void this.server.to('admin-room').emit('new-ticket', ticket);
   }
 
   notifyNewChatMessage(message: Record<string, any>) {

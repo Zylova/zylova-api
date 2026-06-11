@@ -116,6 +116,14 @@ export class DownloadService {
       throw new BadRequestException('Only .zip files are allowed');
     }
 
+    const zipMagic = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+    const fileHeader = file.buffer.slice(0, 4);
+    if (!fileHeader.equals(zipMagic)) {
+      throw new BadRequestException(
+        'Invalid file format — only valid ZIP files are allowed',
+      );
+    }
+
     const existing = await this.prisma.productFile.findUnique({
       where: { productId },
     });

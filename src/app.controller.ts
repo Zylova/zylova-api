@@ -1,6 +1,8 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PrismaService } from './prisma/prisma.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @SkipThrottle()
 @Controller()
@@ -14,6 +16,23 @@ export class AppController {
       version: '1.0.0',
       timestamp: new Date().toISOString(),
     };
+  }
+
+  @Get('maintenance')
+  getMaintenance(): Record<string, boolean> {
+    let enabled = false;
+    try {
+      const configPath = path.join(process.cwd(), 'maintenance.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+          enabled: boolean;
+        };
+        enabled = config.enabled;
+      }
+    } catch {
+      /* noop */
+    }
+    return { enabled };
   }
 
   @Get('db-check')

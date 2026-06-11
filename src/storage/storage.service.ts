@@ -1,6 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
 import * as fs from 'fs';
@@ -33,7 +38,9 @@ export class StorageService implements OnModuleInit {
         },
         forcePathStyle: !!this.config.get<string>('S3_ENDPOINT'),
       });
-      this.logger.log(`S3 storage configured: bucket=${this.bucket}, region=${this.config.get('S3_REGION')}`);
+      this.logger.log(
+        `S3 storage configured: bucket=${this.bucket}, region=${this.config.get('S3_REGION')}`,
+      );
     } else {
       if (!fs.existsSync(this.localDir)) {
         fs.mkdirSync(this.localDir, { recursive: true });
@@ -78,7 +85,9 @@ export class StorageService implements OnModuleInit {
   async delete(key: string): Promise<void> {
     if (this.useS3 && this.s3) {
       try {
-        await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+        await this.s3.send(
+          new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+        );
         this.logger.log(`Deleted from S3: ${key}`);
       } catch (e) {
         this.logger.warn(`S3 delete failed: ${key}`, e);
@@ -96,7 +105,9 @@ export class StorageService implements OnModuleInit {
   async exists(key: string): Promise<boolean> {
     if (this.useS3 && this.s3) {
       try {
-        await this.s3.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+        await this.s3.send(
+          new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+        );
         return true;
       } catch {
         return false;

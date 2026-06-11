@@ -120,7 +120,21 @@ export class EmailService {
 </body>
 </html>`;
 
-    await this.send({ to: order.email, subject: 'Order Confirmation — Zylova Digital Agency', html });
+    await this.send({
+      to: order.email,
+      subject: 'Order Confirmation — Zylova Digital Agency',
+      html,
+    });
+  }
+
+  async sendVerificationEmail(to: string, token: string): Promise<void> {
+    const verificationUrl = `${process.env.FRONTEND_URL || 'https://zylova-landing.vercel.app'}/verify-email?token=${token}`;
+
+    await this.send({
+      to,
+      subject: 'Verify your Zylova account',
+      html: `<h1>Welcome to Zylova!</h1><p>Click the link below to verify your email:</p><a href="${verificationUrl}">${verificationUrl}</a><p>This link expires in 24 hours.</p>`,
+    });
   }
 
   async send(dto: { to: string; subject: string; html: string }) {

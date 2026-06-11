@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from './config/config.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -20,7 +20,11 @@ import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './audit/audit.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 import { CouponModule } from './coupon/coupon.module';
+import { TicketModule } from './ticket/ticket.module';
+import { ChangelogModule } from './changelog/changelog.module';
+import { LicensesModule } from './licenses/licenses.module';
 import { AppController } from './app.controller';
+import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
 
 @Module({
   imports: [
@@ -45,7 +49,14 @@ import { AppController } from './app.controller';
     AuditModule,
     WishlistModule,
     CouponModule,
+    TicketModule,
+    ChangelogModule,
+    LicensesModule,
   ],
   controllers: [AppController],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(MaintenanceMiddleware).forRoutes('*');
+  }
+}

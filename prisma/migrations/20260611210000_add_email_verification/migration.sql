@@ -1,0 +1,3 @@
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verificationToken" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verificationTokenExpires" TIMESTAMPTZ;

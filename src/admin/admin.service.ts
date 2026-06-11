@@ -227,8 +227,9 @@ export class AdminService {
 
   async getStats() {
     const stats = await this._computeStats();
+    const revenueByMonth = await this.getRevenueByMonth();
     this.events.notifyStatsUpdated(stats);
-    return stats;
+    return { ...stats, revenueByMonth };
   }
 
   private async _computeStats() {
@@ -262,6 +263,27 @@ export class AdminService {
     };
   }
 
+  private async getRevenueByMonth() {
+    const orders = await this.prisma.order.findMany({
+      where: { status: 'paid' },
+      select: { total: true, createdAt: true },
+    });
+
+    const monthlyMap = new Map<string, { revenue: number; orders: number }>();
+
+    for (const order of orders) {
+      const monthKey = order.createdAt.toISOString().slice(0, 7);
+      const entry = monthlyMap.get(monthKey) || { revenue: 0, orders: 0 };
+      entry.revenue += order.total || 0;
+      entry.orders += 1;
+      monthlyMap.set(monthKey, entry);
+    }
+
+    return Array.from(monthlyMap.entries())
+      .map(([month, data]) => ({ month, ...data }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }
+
   async notifyStats() {
     const stats = await this._computeStats();
     this.events.notifyStatsUpdated(stats);
@@ -272,6 +294,82 @@ export class AdminService {
     return this.prisma.newsletterSubscriber.findMany({
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getOrders(page = 1, limit = 20, search?: string, status?: string) {
+    const skip = (page - 1) * limit;
+    const where: Record<string, unknown> = {};
+
+    if (status) where.status = status;
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { id: { contains: search } },
+      ];
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where: where as any,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.order.count({ where: where as any }),
+    ]);
+
+    return { orders, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getAuditLogs(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [logs, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.auditLog.count(),
+    ]);
+    return { logs, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async exportOrdersCSV(): Promise<string> {
+    const orders = await this.prisma.order.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const header = 'ID,Email,Items,Amount,Currency,Status,Created At\n';
+    const rows = orders
+      .map((o) => {
+        const items = o.items as Array<{
+          product?: { name?: string };
+          name?: string;
+        }>;
+        const itemNames = items
+          .map((i) => i.product?.name || i.name || 'Unknown')
+          .join('; ');
+        return `${o.id},"${o.email}","${itemNames}",${o.total},USD,${o.status},${o.createdAt.toISOString()}`;
+      })
+      .join('\n');
+
+    return header + rows;
+  }
+
+  async exportUsersCSV(): Promise<string> {
+    const users = await this.prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const header = 'ID,Name,Email,Role,Banned,Created At\n';
+    const rows = users
+      .map(
+        (u) =>
+          `${u.id},"${u.name || ''}",${u.email},${u.role},${u.banned},${u.createdAt.toISOString()}`,
+      )
+      .join('\n');
+
+    return header + rows;
   }
 
   async resetUsers(emails: string[]) {

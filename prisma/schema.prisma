@@ -25,20 +25,29 @@ enum Category {
 }
 
 model User {
-  id              String    @id @default(uuid())
-  email           String    @unique
-  password        String
-  name            String
-  role            Role      @default(USER)
-  banned          Boolean   @default(false)
-  wishlist        String[]  @default([])
-  googleId        String?   @unique
-  facebookId      String?   @unique
-  refreshToken    String?
-  resetToken      String?
-  resetTokenExpiry DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  password                String
+  name                    String
+  role                    Role      @default(USER)
+  banned                  Boolean   @default(false)
+  emailVerified           Boolean   @default(false)
+  verificationToken       String?
+  verificationTokenExpires DateTime?
+  wishlist                String[]  @default([])
+  googleId                String?   @unique
+  facebookId              String?   @unique
+  refreshToken              String?
+  resetToken                String?
+  resetTokenExpiry          DateTime?
+  twoFactorSecret           String?
+  twoFactorEnabled          Boolean   @default(false)
+  twoFactorFailedAttempts   Int       @default(0)
+  twoFactorLockedUntil      DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  tickets                 Ticket[]
+  ticketReplies           TicketReply[]
 
   @@map("users")
 }
@@ -61,6 +70,8 @@ model Product {
   version        String   @default("1.0.0")
   lastUpdated    String   @default("")
   salesCount     Int      @default(0)
+  viewCount      Int      @default(0)
+  addToCartCount Int      @default(0)
   rating         Float    @default(0)
   highlighted    Boolean        @default(false)
   status         ProductStatus  @default(pending)
@@ -68,6 +79,7 @@ model Product {
   exclusive      Boolean        @default(false)
   sold           Boolean        @default(false)
   createdAt      DateTime       @default(now())
+  changelogs    Changelog[]
   updatedAt      DateTime @updatedAt
 
   @@map("products")
@@ -120,6 +132,7 @@ model Order {
   downloadToken   String      @unique
   stripeSession   String?
   refundReason    String?
+  internalNote    String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -196,6 +209,47 @@ model Coupon {
   updatedAt     DateTime  @updatedAt
 
   @@map("coupons")
+}
+
+model Changelog {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  version   String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("changelogs")
+}
+
+model Ticket {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  content   String
+  status    String   @default("open")
+  priority  String   @default("normal")
+  category  String   @default("general")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  replies   TicketReply[]
+  @@map("tickets")
+}
+
+model TicketReply {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("ticket_replies")
 }
 
 model AuditLog {

@@ -12,6 +12,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
+import { TwoFactorService } from './two-factor.service';
 import {
   RegisterDto,
   LoginDto,
@@ -19,13 +20,18 @@ import {
   ResetPasswordDto,
 } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { Request, Response } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly twoFactorService: TwoFactorService,
+  ) {}
 
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('register')
@@ -47,6 +53,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   profile(@CurrentUser('id') userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  @Get('verify-email')
+  @ApiOperation({ summary: 'Verify email address' })
+  async verifyEmail(@Query('token') token: string) {
+    return this.authService.verifyEmail(token);
   }
 
   @Throttle({ default: { ttl: 60000, limit: 3 } })
@@ -110,5 +122,40 @@ export class AuthController {
     res.redirect(
       `${frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&user=${encodeURIComponent(JSON.stringify(result.user))}`,
     );
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post('login/2fa')
+  @ApiOperation({ summary: 'Complete login with 2FA code' })
+  loginWith2fa(@Body() dto: { userId: string; code: string }) {
+    return this.authService.loginWith2fa(dto.userId, dto.code);
+  }
+
+  @Post('2fa/generate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Generate 2FA secret and QR code' })
+  generate2fa(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('email') email: string,
+  ) {
+    return this.twoFactorService.generateSecret(userId, email);
+  }
+
+  @Post('2fa/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify and enable 2FA' })
+  verify2fa(@CurrentUser('id') userId: string, @Body() dto: { code: string }) {
+    return this.twoFactorService.verifyAndEnable(userId, dto.code);
+  }
+
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Disable 2FA (admin)' })
+  disable2fa(@CurrentUser('id') userId: string) {
+    return this.twoFactorService.disable(userId);
   }
 }

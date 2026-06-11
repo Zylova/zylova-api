@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
+import { TwoFactorService } from './two-factor.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 
@@ -24,6 +25,8 @@ describe('AuthService', () => {
     password: 'hashed-password',
     refreshToken: 'hashed-password',
     role: 'USER' as const,
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
   };
@@ -45,6 +48,14 @@ describe('AuthService', () => {
 
   const mockEmailService = {
     send: jest.fn().mockResolvedValue({ sent: true }),
+    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockTwoFactorService = {
+    generateSecret: jest.fn(),
+    verifyAndEnable: jest.fn(),
+    verifyToken: jest.fn(),
+    disable: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -54,6 +65,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwtService },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: TwoFactorService, useValue: mockTwoFactorService },
       ],
     }).compile();
 
@@ -85,16 +97,18 @@ describe('AuthService', () => {
       expect(result.user).not.toHaveProperty('password');
     });
 
-    it('should throw ConflictException if email exists', async () => {
+    it('should return opaque success if email exists', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
 
-      await expect(
-        service.register({
-          email: 'test@test.com',
-          name: 'Test',
-          password: 'password123',
-        }),
-      ).rejects.toThrow(ConflictException);
+      const result = await service.register({
+        email: 'test@test.com',
+        name: 'Test',
+        password: 'password123',
+      });
+
+      expect(result).toEqual({
+        message: 'Registration successful. Please check your email to verify your account.',
+      });
     });
   });
 

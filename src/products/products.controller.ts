@@ -26,7 +26,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get all approved products' })
+  @ApiOperation({ summary: 'Get all approved products with filters, sorting, and pagination' })
   findAll(@Query() query: ProductQueryDto) {
     return this.productsService.findAll(query);
   }
@@ -78,6 +78,18 @@ export class ProductsController {
       dto.status as any,
       dto.rejectReason,
     );
+  }
+
+  @Post(':id/view')
+  @ApiOperation({ summary: 'Increment product view count' })
+  async incrementView(@Param('id') id: string) {
+    return this.productsService.incrementView(id);
+  }
+
+  @Post(':id/add-to-cart')
+  @ApiOperation({ summary: 'Increment add-to-cart count' })
+  async incrementAddToCart(@Param('id') id: string) {
+    return this.productsService.incrementAddToCart(id);
   }
 
   @Delete(':id')

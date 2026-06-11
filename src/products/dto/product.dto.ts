@@ -37,4 +37,10 @@ export class UpdateProductDto {
 export class ProductQueryDto {
   @IsOptional() @IsString() category?: string;
   @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsString() minPrice?: string;
+  @IsOptional() @IsString() maxPrice?: string;
+  @IsOptional() @IsString() sort?: string;
+  @IsOptional() @IsString() page?: string;
+  @IsOptional() @IsString() limit?: string;
+  @IsOptional() @IsString() exclude?: string;
 }

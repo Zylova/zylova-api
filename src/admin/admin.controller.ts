@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Body,
+  Header,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -18,8 +19,12 @@ import {
   ApiOperation,
   ApiConsumes,
 } from '@nestjs/swagger';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AdminService } from './admin.service';
 import { DownloadService } from '../download/download.service';
+import { OrdersService } from '../orders/orders.service';
+import { ProductsService } from '../products/products.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -33,6 +38,8 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly downloadService: DownloadService,
+    private readonly ordersService: OrdersService,
+    private readonly productsService: ProductsService,
   ) {}
 
   @Get('users')
@@ -85,6 +92,15 @@ export class AdminController {
     return this.adminService.updateContactStatus(id, body.status);
   }
 
+  @Patch('orders/:id/note')
+  @ApiOperation({ summary: 'Add internal note to order' })
+  async updateOrderNote(
+    @Param('id') id: string,
+    @Body() dto: { note: string },
+  ) {
+    return this.ordersService.updateInternalNote(id, dto.note);
+  }
+
   @Patch('orders/:id')
   @ApiOperation({ summary: 'Update order status' })
   updateOrderStatus(
@@ -96,6 +112,12 @@ export class AdminController {
       body.status,
       body.refundReason,
     );
+  }
+
+  @Post('products/:id/clone')
+  @ApiOperation({ summary: 'Clone a product' })
+  async cloneProduct(@Param('id') id: string) {
+    return this.productsService.cloneProduct(id);
   }
 
   @Patch('products/:id')
@@ -115,6 +137,34 @@ export class AdminController {
   @ApiOperation({ summary: 'Get dashboard statistics' })
   getStats() {
     return this.adminService.getStats();
+  }
+
+  @Get('maintenance')
+  @ApiOperation({ summary: 'Get maintenance mode status' })
+  getMaintenance(): Record<string, boolean> {
+    let enabled = false;
+    try {
+      const configPath = path.join(process.cwd(), 'maintenance.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+          enabled: boolean;
+        };
+        enabled = config.enabled;
+      }
+    } catch {
+      /* noop */
+    }
+    return { enabled };
+  }
+
+  @Post('maintenance')
+  @ApiOperation({ summary: 'Toggle maintenance mode' })
+  toggleMaintenance(@Body() dto: { enabled: boolean }): {
+    maintenance: boolean;
+  } {
+    const configPath = path.join(process.cwd(), 'maintenance.json');
+    fs.writeFileSync(configPath, JSON.stringify({ enabled: dto.enabled }));
+    return { maintenance: dto.enabled };
   }
 
   @Get('newsletter')
@@ -150,5 +200,51 @@ export class AdminController {
   @ApiOperation({ summary: 'Delete product file (admin)' })
   deleteProductFile(@Param('productId') productId: string) {
     return this.downloadService.deleteProductFile(productId);
+  }
+
+  @Get('orders')
+  @ApiOperation({
+    summary: 'List all orders with search, status, and pagination',
+  })
+  async getOrders(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getOrders(
+      Number(page) || 1,
+      Number(limit) || 20,
+      search,
+      status,
+    );
+  }
+
+  @Get('audit-logs')
+  @ApiOperation({ summary: 'Get audit logs with pagination' })
+  async getAuditLogs(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getAuditLogs(
+      Number(page) || 1,
+      Number(limit) || 20,
+    );
+  }
+
+  @Get('export/orders')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="orders.csv"')
+  @ApiOperation({ summary: 'Export orders as CSV' })
+  async exportOrders() {
+    return this.adminService.exportOrdersCSV();
+  }
+
+  @Get('export/users')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="users.csv"')
+  @ApiOperation({ summary: 'Export users as CSV' })
+  async exportUsers() {
+    return this.adminService.exportUsersCSV();
   }
 }
