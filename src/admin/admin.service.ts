@@ -372,6 +372,117 @@ export class AdminService {
     return header + rows;
   }
 
+  async bulkDeleteProducts(ids: string[]) {
+    const { count } = await this.prisma.product.deleteMany({
+      where: { id: { in: ids } },
+    });
+    await this.auditService.log({
+      action: 'bulk_delete_products',
+      entity: 'product',
+      metadata: { ids, count },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { deleted: count };
+  }
+
+  async bulkUpdateProductsStatus(
+    ids: string[],
+    status: string,
+    rejectReason?: string,
+  ) {
+    const validStatuses = ['draft', 'pending', 'approved', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestException(`Invalid product status: ${status}`);
+    }
+    const { count } = await this.prisma.product.updateMany({
+      where: { id: { in: ids } },
+      data: { status: status as any, rejectReason },
+    });
+    await this.auditService.log({
+      action: 'bulk_update_product_status',
+      entity: 'product',
+      metadata: { ids, status, rejectReason, count },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { updated: count };
+  }
+
+  async bulkDeleteOrders(ids: string[]) {
+    const { count } = await this.prisma.order.deleteMany({
+      where: { id: { in: ids } },
+    });
+    await this.auditService.log({
+      action: 'bulk_delete_orders',
+      entity: 'order',
+      metadata: { ids, count },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { deleted: count };
+  }
+
+  async bulkUpdateOrdersStatus(
+    ids: string[],
+    status: string,
+    refundReason?: string,
+  ) {
+    const transitions: Record<string, string[]> = {
+      pending: ['paid'],
+      paid: ['delivered', 'refunded'],
+      delivered: ['completed', 'refunded'],
+      refunded: [],
+      completed: [],
+    };
+
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+    });
+
+    let updatedCount = 0;
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const order of orders) {
+      const allowed = transitions[order.status] || [];
+      if (!allowed.includes(status)) {
+        errors.push({
+          id: order.id,
+          error: `Cannot transition from "${order.status}" to "${status}". Allowed: ${allowed.join(', ')}`,
+        });
+        continue;
+      }
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status,
+          ...(status === 'refunded' && refundReason ? { refundReason } : {}),
+        },
+      });
+      if (status === 'refunded') {
+        try {
+          await this.paymentService.processRefund({
+            id: order.id,
+            stripeSession: order.stripeSession,
+            paymentMethod: order.paymentMethod,
+            total: order.total,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Refund failed for order ${order.id}: ${(err as Error).message}`,
+          );
+        }
+      }
+      this.events.notifyOrderUpdated(order);
+      updatedCount++;
+    }
+
+    await this.auditService.log({
+      action: 'bulk_update_order_status',
+      entity: 'order',
+      metadata: { ids, status, refundReason, updatedCount, errors },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { updated: updatedCount, errors };
+  }
+
   async resetUsers(emails: string[]) {
     await this.prisma.user.deleteMany();
     const created: Array<{ id: string; email: string }> = [];

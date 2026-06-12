@@ -232,6 +232,42 @@ export class AdminController {
     );
   }
 
+  @Post('products/bulk-delete')
+  @ApiOperation({ summary: 'Delete multiple products' })
+  async bulkDeleteProducts(@Body() body: { ids: string[] }) {
+    return this.adminService.bulkDeleteProducts(body.ids);
+  }
+
+  @Post('products/bulk-status')
+  @ApiOperation({ summary: 'Update status of multiple products' })
+  async bulkUpdateProductStatus(
+    @Body() body: { ids: string[]; status: string; rejectReason?: string },
+  ) {
+    return this.adminService.bulkUpdateProductsStatus(
+      body.ids,
+      body.status,
+      body.rejectReason,
+    );
+  }
+
+  @Post('orders/bulk-delete')
+  @ApiOperation({ summary: 'Delete multiple orders' })
+  async bulkDeleteOrders(@Body() body: { ids: string[] }) {
+    return this.adminService.bulkDeleteOrders(body.ids);
+  }
+
+  @Post('orders/bulk-status')
+  @ApiOperation({ summary: 'Update status of multiple orders' })
+  async bulkUpdateOrderStatus(
+    @Body() body: { ids: string[]; status: string; refundReason?: string },
+  ) {
+    return this.adminService.bulkUpdateOrdersStatus(
+      body.ids,
+      body.status,
+      body.refundReason,
+    );
+  }
+
   @Get('export/orders')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="orders.csv"')
