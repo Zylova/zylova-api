@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateProductDto,
@@ -6,12 +6,20 @@ import {
   ProductQueryDto,
 } from './dto/product.dto';
 import { ProductStatus } from '@prisma/client';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CacheService) private readonly cache: CacheService,
+  ) {}
 
   async findAll(query?: ProductQueryDto) {
+    const cacheKey = `products:findAll:${JSON.stringify(query || {})}`;
+    const cached = await this.cache.get<{ products: unknown[]; total: number; page: number; limit: number; totalPages: number }>(cacheKey);
+    if (cached) return cached;
+
     const where: Record<string, unknown> = { status: 'approved' };
 
     where.NOT = { exclusive: true, sold: true };
@@ -64,7 +72,9 @@ export class ProductsService {
       this.prisma.product.count({ where: where as any }),
     ]);
 
-    return { products, total, page, limit, totalPages: Math.ceil(total / limit) };
+    const result = { products, total, page, limit, totalPages: Math.ceil(total / limit) };
+    await this.cache.set(cacheKey, result, 120_000);
+    return result;
   }
 
   async incrementView(productId: string) {
@@ -93,8 +103,14 @@ export class ProductsService {
   }
 
   async findById(id: string) {
+    const cacheKey = `products:findById:${id}`;
+    const cached = await this.cache.get<unknown>(cacheKey);
+    if (cached) return cached;
+
     const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) throw new NotFoundException('Product not found');
+
+    await this.cache.set(cacheKey, product, 300_000);
     return product;
   }
 
@@ -106,32 +122,36 @@ export class ProductsService {
 
   async update(id: string, dto: UpdateProductDto) {
     await this.findById(id);
-    return this.prisma.product.update({ where: { id }, data: dto });
+    const result = await this.prisma.product.update({ where: { id }, data: dto });
+    await this.cache.deletePattern(`products:.*${id}.*`);
+    await this.cache.deletePattern('products:findAll:.*');
+    return result;
   }
 
   async updateStatus(id: string, status: ProductStatus, rejectReason?: string) {
     await this.findById(id);
-    return this.prisma.product.update({
+    const result = await this.prisma.product.update({
       where: { id },
       data: { status, rejectReason },
     });
+    await this.cache.deletePattern(`products:.*`);
+    return result;
   }
 
   async cloneProduct(productId: string) {
-    const original = await this.findById(productId);
+    const original = await this.prisma.product.findUniqueOrThrow({ where: { id: productId } });
     const { id, createdAt, updatedAt, ...data } = original;
-    return this.prisma.product.create({
-      data: {
-        ...data,
-        name: `${data.name} (Copy)`,
-        status: 'draft',
-        sold: false,
-      },
+    const result = await this.prisma.product.create({
+      data: { ...data, name: `${data.name} (Copy)`, status: 'draft', sold: false },
     });
+    await this.cache.deletePattern('products:findAll:.*');
+    return result;
   }
 
   async remove(id: string) {
     await this.findById(id);
-    return this.prisma.product.delete({ where: { id } });
+    const result = await this.prisma.product.delete({ where: { id } });
+    await this.cache.deletePattern(`products:.*`);
+    return result;
   }
 }

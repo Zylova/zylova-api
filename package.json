@@ -21,6 +21,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "backup": "ts-node scripts/backup.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },

@@ -24,6 +24,7 @@ import * as path from 'path';
 import { AdminService } from './admin.service';
 import { DownloadService } from '../download/download.service';
 import { OrdersService } from '../orders/orders.service';
+import { CacheService } from '../cache/cache.service';
 import { ProductsService } from '../products/products.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -40,7 +41,88 @@ export class AdminController {
     private readonly downloadService: DownloadService,
     private readonly ordersService: OrdersService,
     private readonly productsService: ProductsService,
+    private readonly cacheService: CacheService,
   ) {}
+
+  @Get('bundles')
+  @ApiOperation({ summary: 'List all bundles (admin)' })
+  listBundles() {
+    return this.adminService.listBundles();
+  }
+
+  @Post('bundles')
+  @ApiOperation({ summary: 'Create a bundle (admin)' })
+  createBundle(@Body() body: {
+    name: string;
+    slug: string;
+    description?: string;
+    discountPercent: number;
+    validFrom?: string;
+    validUntil?: string;
+    active?: boolean;
+    productIds: string[];
+  }) {
+    return this.adminService.createBundle(body);
+  }
+
+  @Patch('bundles/:id')
+  @ApiOperation({ summary: 'Update a bundle (admin)' })
+  updateBundle(
+    @Param('id') id: string,
+    @Body() body: {
+      name?: string;
+      slug?: string;
+      description?: string;
+      discountPercent?: number;
+      validFrom?: string;
+      validUntil?: string;
+      active?: boolean;
+      productIds?: string[];
+    },
+  ) {
+    return this.adminService.updateBundle(id, body);
+  }
+
+  @Delete('bundles/:id')
+  @ApiOperation({ summary: 'Delete a bundle (admin)' })
+  deleteBundle(@Param('id') id: string) {
+    return this.adminService.deleteBundle(id);
+  }
+
+  @Get('flash-sales')
+  @ApiOperation({ summary: 'List all flash sales (admin)' })
+  listFlashSales() {
+    return this.adminService.listFlashSales();
+  }
+
+  @Post('flash-sales')
+  @ApiOperation({ summary: 'Create a flash sale (admin)' })
+  createFlashSale(@Body() body: {
+    productId: string;
+    discountPercent: number;
+    startTime: string;
+    endTime: string;
+    active?: boolean;
+  }) {
+    return this.adminService.createFlashSale(body);
+  }
+
+  @Patch('flash-sales/:id')
+  @ApiOperation({ summary: 'Update a flash sale (admin)' })
+  updateFlashSale(@Param('id') id: string, @Body() body: {
+    discountPercent?: number;
+    startTime?: string;
+    endTime?: string;
+    active?: boolean;
+  }) {
+    return this.adminService.updateFlashSale(id, body);
+  }
+
+  @Delete('flash-sales/:id')
+  @ApiOperation({ summary: 'Delete a flash sale (admin)' })
+  deleteFlashSale(@Param('id') id: string) {
+    return this.adminService.deleteFlashSale(id);
+  }
 
   @Get('users')
   @ApiOperation({ summary: 'List users with search and pagination' })
@@ -171,6 +253,19 @@ export class AdminController {
     const configPath = path.join(process.cwd(), 'maintenance.json');
     fs.writeFileSync(configPath, JSON.stringify({ enabled: dto.enabled }));
     return { maintenance: dto.enabled };
+  }
+
+  @Get('cache')
+  @ApiOperation({ summary: 'Get cache stats' })
+  getCacheStats() {
+    return { cache: this.cacheService.getStats() };
+  }
+
+  @Delete('cache')
+  @ApiOperation({ summary: 'Clear all cache' })
+  async clearCache() {
+    await this.cacheService.clear();
+    return { cleared: true };
   }
 
   @Get('newsletter')

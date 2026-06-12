@@ -33,6 +33,28 @@ export class AuthService {
       data: { email: dto.email, name: sanitize(dto.name), password: hashedPassword },
     });
 
+    // Apply referral code if provided
+    if (dto.referralCode) {
+      try {
+        const referrer = await this.prisma.user.findUnique({
+          where: { referralCode: dto.referralCode },
+        });
+        if (referrer && referrer.id !== user.id) {
+          await this.prisma.referral.create({
+            data: {
+              referrerId: referrer.id,
+              refereeId: user.id,
+              refereeEmail: user.email,
+              code: dto.referralCode,
+              status: 'pending',
+            },
+          });
+        }
+      } catch {
+        // Silently fail - referral is optional
+      }
+    }
+
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 

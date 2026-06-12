@@ -28,24 +28,32 @@ export class DownloadController {
     @Res() res: Response,
   ) {
     const ip = req.ip;
+    const userAgent = req.headers['user-agent'] || undefined;
     const result = await this.downloadService.downloadProduct(
       token,
       productId,
       ip,
+      userAgent,
     );
 
-    if (!result.stream) {
+    // If CDN URL is available, redirect to it
+    if ('cdnUrl' in result && (result as { cdnUrl: string }).cdnUrl) {
+      return res.redirect(302, (result as { cdnUrl: string }).cdnUrl);
+    }
+
+    const streamResult = result as { stream: NodeJS.ReadableStream; fileName: string; licenseKey: string };
+    if (!streamResult.stream) {
       return res.status(404).json({ error: 'File not found on server' });
     }
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${result.fileName}"`,
+      `attachment; filename="${streamResult.fileName}"`,
     );
-    res.setHeader('X-License-Key', result.licenseKey);
+    res.setHeader('X-License-Key', streamResult.licenseKey);
 
-    result.stream.pipe(res);
+    streamResult.stream.pipe(res);
   }
 
   @Get('file-info/:productId')
