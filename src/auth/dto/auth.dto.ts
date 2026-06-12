@@ -12,6 +12,7 @@ export class RegisterDto {
     },
   )
   password: string;
+  referralCode?: string;
 }
 
 export class LoginDto {

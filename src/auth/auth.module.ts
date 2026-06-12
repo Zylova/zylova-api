@@ -7,6 +7,7 @@ import { TwoFactorService } from './two-factor.service';
 import { JwtStrategy } from './jwt.strategy';
 import { GoogleStrategy } from './google.strategy';
 import { FacebookStrategy } from './facebook.strategy';
+import { GithubStrategy } from './github.strategy';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { FacebookStrategy } from './facebook.strategy';
     JwtStrategy,
     GoogleStrategy,
     FacebookStrategy,
+    GithubStrategy,
   ],
   exports: [AuthService, TwoFactorService],
 })

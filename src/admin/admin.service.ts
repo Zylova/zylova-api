@@ -225,6 +225,103 @@ export class AdminService {
     return { product: updated };
   }
 
+  async getDownloadStats() {
+    const [totalDownloads, uniqueDownloads, downloadsByMonth, topDownloads, downloadsByCountry, recentDownloads] =
+      await Promise.all([
+        this.prisma.downloadLog.count({ where: { downloaded: true } }),
+        this.prisma.downloadLog.groupBy({
+          by: ['productId'],
+          where: { downloaded: true },
+        }),
+        this.getDownloadsByMonth(),
+        this.prisma.downloadLog.groupBy({
+          by: ['productId'],
+          where: { downloaded: true },
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 10,
+        }),
+        this.prisma.downloadLog.groupBy({
+          by: ['country'],
+          where: { downloaded: true, country: { not: null } },
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 20,
+        }),
+        this.prisma.downloadLog.findMany({
+          where: { downloaded: true },
+          orderBy: { downloadedAt: 'desc' },
+          take: 50,
+          select: {
+            id: true,
+            productId: true,
+            email: true,
+            country: true,
+            downloadedAt: true,
+            licenseKey: true,
+          },
+        }),
+      ]);
+
+    const topProductIds = topDownloads.map((d) => d.productId);
+    const topProducts = topProductIds.length > 0
+      ? await this.prisma.product.findMany({
+          where: { id: { in: topProductIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+
+    const topProductMap = new Map(topProducts.map((p) => [p.id, p.name]));
+    const top = topDownloads.map((d) => ({
+      productId: d.productId,
+      productName: topProductMap.get(d.productId) || 'Unknown',
+      downloads: d._count.id,
+    }));
+
+    const productIds = [...new Set(recentDownloads.map((d) => d.productId))];
+    const productNames = productIds.length > 0
+      ? await this.prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nameMap = new Map(productNames.map((p) => [p.id, p.name]));
+
+    return {
+      totalDownloads,
+      uniqueDownloads: uniqueDownloads.length,
+      downloadsByMonth,
+      topDownloads: top,
+      downloadsByCountry: downloadsByCountry.map((d) => ({
+        country: d.country || 'Unknown',
+        downloads: d._count.id,
+      })),
+      recentDownloads: recentDownloads.map((d) => ({
+        ...d,
+        productName: nameMap.get(d.productId) || 'Unknown',
+      })),
+    };
+  }
+
+  private async getDownloadsByMonth() {
+    const logs = await this.prisma.downloadLog.findMany({
+      where: { downloaded: true },
+      select: { downloadedAt: true },
+    });
+
+    const monthlyMap = new Map<string, number>();
+    for (const log of logs) {
+      const monthKey = log.downloadedAt
+        ? log.downloadedAt.toISOString().slice(0, 7)
+        : 'unknown';
+      monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
+    }
+
+    return Array.from(monthlyMap.entries())
+      .map(([month, downloads]) => ({ month, downloads }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }
+
   async getStats() {
     const stats = await this._computeStats();
     const revenueByMonth = await this.getRevenueByMonth();
@@ -370,6 +467,298 @@ export class AdminService {
       .join('\n');
 
     return header + rows;
+  }
+
+  async bulkDeleteProducts(ids: string[]) {
+    const { count } = await this.prisma.product.deleteMany({
+      where: { id: { in: ids } },
+    });
+    await this.auditService.log({
+      action: 'bulk_delete_products',
+      entity: 'product',
+      metadata: { ids, count },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { deleted: count };
+  }
+
+  async bulkUpdateProductsStatus(
+    ids: string[],
+    status: string,
+    rejectReason?: string,
+  ) {
+    const validStatuses = ['draft', 'pending', 'approved', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestException(`Invalid product status: ${status}`);
+    }
+    const { count } = await this.prisma.product.updateMany({
+      where: { id: { in: ids } },
+      data: { status: status as any, rejectReason },
+    });
+    await this.auditService.log({
+      action: 'bulk_update_product_status',
+      entity: 'product',
+      metadata: { ids, status, rejectReason, count },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { updated: count };
+  }
+
+  async bulkDeleteOrders(ids: string[]) {
+    const { count } = await this.prisma.order.deleteMany({
+      where: { id: { in: ids } },
+    });
+    await this.auditService.log({
+      action: 'bulk_delete_orders',
+      entity: 'order',
+      metadata: { ids, count },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { deleted: count };
+  }
+
+  async bulkUpdateOrdersStatus(
+    ids: string[],
+    status: string,
+    refundReason?: string,
+  ) {
+    const transitions: Record<string, string[]> = {
+      pending: ['paid'],
+      paid: ['delivered', 'refunded'],
+      delivered: ['completed', 'refunded'],
+      refunded: [],
+      completed: [],
+    };
+
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+    });
+
+    let updatedCount = 0;
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const order of orders) {
+      const allowed = transitions[order.status] || [];
+      if (!allowed.includes(status)) {
+        errors.push({
+          id: order.id,
+          error: `Cannot transition from "${order.status}" to "${status}". Allowed: ${allowed.join(', ')}`,
+        });
+        continue;
+      }
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status,
+          ...(status === 'refunded' && refundReason ? { refundReason } : {}),
+        },
+      });
+      if (status === 'refunded') {
+        try {
+          await this.paymentService.processRefund({
+            id: order.id,
+            stripeSession: order.stripeSession,
+            paymentMethod: order.paymentMethod,
+            total: order.total,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Refund failed for order ${order.id}: ${(err as Error).message}`,
+          );
+        }
+      }
+      this.events.notifyOrderUpdated(order);
+      updatedCount++;
+    }
+
+    await this.auditService.log({
+      action: 'bulk_update_order_status',
+      entity: 'order',
+      metadata: { ids, status, refundReason, updatedCount, errors },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { updated: updatedCount, errors };
+  }
+
+  async listBundles() {
+    return this.prisma.bundle.findMany({
+      include: {
+        products: {
+          include: { product: { select: { id: true, name: true, price: true, image: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createBundle(body: {
+    name: string;
+    slug: string;
+    description?: string;
+    discountPercent: number;
+    validFrom?: string;
+    validUntil?: string;
+    active?: boolean;
+    productIds: string[];
+  }) {
+    const { productIds, validFrom, validUntil, ...data } = body;
+    const bundle = await this.prisma.bundle.create({
+      data: {
+        ...data,
+        validFrom: validFrom ? new Date(validFrom) : null,
+        validUntil: validUntil ? new Date(validUntil) : null,
+        products: {
+          create: productIds.map((productId) => ({ productId })),
+        },
+      },
+      include: {
+        products: {
+          include: { product: { select: { id: true, name: true, price: true, image: true } } },
+        },
+      },
+    });
+    await this.auditService.log({
+      action: 'create_bundle',
+      entity: 'bundle',
+      entityId: bundle.id,
+      metadata: { name: bundle.name },
+    });
+    return bundle;
+  }
+
+  async updateBundle(id: string, body: {
+    name?: string;
+    slug?: string;
+    description?: string;
+    discountPercent?: number;
+    validFrom?: string;
+    validUntil?: string;
+    active?: boolean;
+    productIds?: string[];
+  }) {
+    const existing = await this.prisma.bundle.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Bundle not found');
+
+    const { productIds, validFrom, validUntil, ...data } = body;
+
+    if (productIds) {
+      await this.prisma.bundleProduct.deleteMany({ where: { bundleId: id } });
+      await this.prisma.bundleProduct.createMany({
+        data: productIds.map((productId) => ({ bundleId: id, productId })),
+      });
+    }
+
+    const bundle = await this.prisma.bundle.update({
+      where: { id },
+      data: {
+        ...data,
+        ...(validFrom !== undefined ? { validFrom: validFrom ? new Date(validFrom) : null } : {}),
+        ...(validUntil !== undefined ? { validUntil: validUntil ? new Date(validUntil) : null } : {}),
+      },
+      include: {
+        products: {
+          include: { product: { select: { id: true, name: true, price: true, image: true } } },
+        },
+      },
+    });
+    await this.auditService.log({
+      action: 'update_bundle',
+      entity: 'bundle',
+      entityId: id,
+      metadata: { name: bundle.name },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return bundle;
+  }
+
+  async deleteBundle(id: string) {
+    const existing = await this.prisma.bundle.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Bundle not found');
+    await this.prisma.bundle.delete({ where: { id } });
+    await this.auditService.log({
+      action: 'delete_bundle',
+      entity: 'bundle',
+      entityId: id,
+      metadata: { name: existing.name },
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { deleted: true };
+  }
+
+  // ---- Flash Sales ----
+
+  async listFlashSales() {
+    return this.prisma.flashSale.findMany({
+      include: { product: { select: { id: true, name: true, price: true, image: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createFlashSale(body: {
+    productId: string;
+    discountPercent: number;
+    startTime: string;
+    endTime: string;
+    active?: boolean;
+  }) {
+    const sale = await this.prisma.flashSale.create({
+      data: {
+        productId: body.productId,
+        discountPercent: body.discountPercent,
+        startTime: new Date(body.startTime),
+        endTime: new Date(body.endTime),
+        active: body.active ?? true,
+      },
+      include: { product: { select: { id: true, name: true, price: true, image: true } } },
+    });
+    await this.auditService.log({
+      action: 'create_flash_sale',
+      entity: 'flash_sale',
+      entityId: sale.id,
+      metadata: { productId: body.productId },
+    });
+    return sale;
+  }
+
+  async updateFlashSale(id: string, body: {
+    discountPercent?: number;
+    startTime?: string;
+    endTime?: string;
+    active?: boolean;
+  }) {
+    const existing = await this.prisma.flashSale.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Flash sale not found');
+
+    const sale = await this.prisma.flashSale.update({
+      where: { id },
+      data: {
+        ...(body.discountPercent !== undefined ? { discountPercent: body.discountPercent } : {}),
+        ...(body.startTime !== undefined ? { startTime: new Date(body.startTime) } : {}),
+        ...(body.endTime !== undefined ? { endTime: new Date(body.endTime) } : {}),
+        ...(body.active !== undefined ? { active: body.active } : {}),
+      },
+      include: { product: { select: { id: true, name: true, price: true, image: true } } },
+    });
+    await this.auditService.log({
+      action: 'update_flash_sale',
+      entity: 'flash_sale',
+      entityId: id,
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return sale;
+  }
+
+  async deleteFlashSale(id: string) {
+    const existing = await this.prisma.flashSale.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Flash sale not found');
+    await this.prisma.flashSale.delete({ where: { id } });
+    await this.auditService.log({
+      action: 'delete_flash_sale',
+      entity: 'flash_sale',
+      entityId: id,
+    });
+    this.events.notifyStatsUpdated(await this._computeStats());
+    return { deleted: true };
   }
 
   async resetUsers(emails: string[]) {

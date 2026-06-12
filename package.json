@@ -21,6 +21,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "backup": "ts-node scripts/backup.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },
@@ -44,6 +45,7 @@
     "@sentry/integrations": "^7.114.0",
     "@sentry/node": "^10.57.0",
     "@types/passport-facebook": "^3.0.4",
+    "@types/passport-github2": "^1.2.9",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/stripe": "^8.0.416",
     "bcrypt": "^6.0.0",
@@ -53,6 +55,7 @@
     "nodemailer": "^8.0.10",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
+    "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.21.0",

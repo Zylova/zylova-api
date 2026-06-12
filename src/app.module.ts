@@ -25,6 +25,10 @@ import { ChangelogModule } from './changelog/changelog.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { FaqModule } from './faq/faq.module';
 import { CartModule } from './cart/cart.module';
+import { BundleModule } from './bundle/bundle.module';
+import { FlashSaleModule } from './flash-sale/flash-sale.module';
+import { ReferralModule } from './referral/referral.module';
+import { CacheModule } from './cache/cache.module';
 import { AppController } from './app.controller';
 import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
 
@@ -56,6 +60,10 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     LicensesModule,
     FaqModule,
     CartModule,
+    BundleModule,
+    FlashSaleModule,
+    ReferralModule,
+    CacheModule,
   ],
   controllers: [AppController],
 })

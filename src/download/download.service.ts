@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { CdnService } from '../storage/cdn.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class DownloadService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly cdn: CdnService,
   ) {}
 
   async getDownloadInfo(token: string) {
@@ -58,7 +60,20 @@ export class DownloadService {
     return { orderId: order.id, email: order.email, products, token };
   }
 
-  async downloadProduct(token: string, productId: string, ip?: string) {
+  private async getCountryFromIp(ip: string): Promise<string | null> {
+    if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return null;
+    try {
+      const res = await fetch(`http://ip-api.com/json/${ip}?fields=countryCode`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      const data = (await res.json()) as { countryCode?: string };
+      return data.countryCode || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async downloadProduct(token: string, productId: string, ip?: string, userAgent?: string) {
     const order = await this.prisma.order.findUnique({
       where: { downloadToken: token },
     });
@@ -90,12 +105,16 @@ export class DownloadService {
       crypto.randomBytes(2).toString('hex').toUpperCase(),
     ].join('-');
 
+    const geo = ip ? await this.getCountryFromIp(ip) : null;
+
     await this.prisma.downloadLog.create({
       data: {
         token,
         productId,
         email: order.email,
         ip: ip || null,
+        userAgent: userAgent || null,
+        country: geo || null,
         downloaded: true,
         downloadedAt: new Date(),
         licenseKey,
@@ -103,6 +122,15 @@ export class DownloadService {
     });
 
     this.logger.log(`Download: ${order.email} -> ${productId} (${licenseKey})`);
+
+    // Try CDN signed URL first
+    const cdnUrl = this.cdn.isEnabled()
+      ? this.cdn.getSignedUrl(productFile.filePath, 900)
+      : '';
+
+    if (cdnUrl) {
+      return { cdnUrl, fileName: productFile.fileName, licenseKey };
+    }
 
     const fileStream = await this.storage.getStream(productFile.filePath);
     return { stream: fileStream, fileName: productFile.fileName, licenseKey };

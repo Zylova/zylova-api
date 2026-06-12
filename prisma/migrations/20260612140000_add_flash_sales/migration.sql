@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS "flash_sales" (
+  "id" TEXT NOT NULL,
+  "productId" TEXT NOT NULL,
+  "discountPercent" DOUBLE PRECISION NOT NULL,
+  "startTime" TIMESTAMPTZ NOT NULL,
+  "endTime" TIMESTAMPTZ NOT NULL,
+  "active" BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "flash_sales_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "flash_sales_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE
+);

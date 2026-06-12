@@ -33,6 +33,28 @@ export class AuthService {
       data: { email: dto.email, name: sanitize(dto.name), password: hashedPassword },
     });
 
+    // Apply referral code if provided
+    if (dto.referralCode) {
+      try {
+        const referrer = await this.prisma.user.findUnique({
+          where: { referralCode: dto.referralCode },
+        });
+        if (referrer && referrer.id !== user.id) {
+          await this.prisma.referral.create({
+            data: {
+              referrerId: referrer.id,
+              refereeId: user.id,
+              refereeEmail: user.email,
+              code: dto.referralCode,
+              status: 'pending',
+            },
+          });
+        }
+      } catch {
+        // Silently fail - referral is optional
+      }
+    }
+
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -257,14 +279,22 @@ export class AuthService {
       picture?: string;
       googleId?: string;
       facebookId?: string;
+      githubId?: string;
     },
   ) {
     if (!profile.email)
       throw new BadRequestException('Email is required from OAuth provider');
 
-    const idField = provider === 'google' ? 'googleId' : 'facebookId';
-    const profileId =
-      provider === 'google' ? profile.googleId : profile.facebookId;
+    const providerMap: Record<string, { field: string; id: string | undefined }> = {
+      google: { field: 'googleId', id: profile.googleId },
+      facebook: { field: 'facebookId', id: profile.facebookId },
+      github: { field: 'githubId', id: profile.githubId },
+    };
+
+    const providerConfig = providerMap[provider];
+    if (!providerConfig) throw new BadRequestException(`Unknown provider: ${provider}`);
+
+    const { field: idField, id: profileId } = providerConfig;
 
     // Try to find existing user by OAuth ID or email
     let user = await this.prisma.user.findFirst({

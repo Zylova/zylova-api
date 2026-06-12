@@ -37,6 +37,7 @@ model User {
   wishlist                String[]  @default([])
   googleId                String?   @unique
   facebookId              String?   @unique
+  githubId                String?   @unique
   refreshToken              String?
   resetToken                String?
   resetTokenExpiry          DateTime?
@@ -44,13 +45,36 @@ model User {
   twoFactorEnabled          Boolean   @default(false)
   twoFactorFailedAttempts   Int       @default(0)
   twoFactorLockedUntil      DateTime?
+  referralCode            String?   @unique
+  referralCommission      Float     @default(0)
   createdAt                 DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
   tickets                 Ticket[]
   ticketReplies           TicketReply[]
   cartItems               CartItem[]
+  referralsMade           Referral[] @relation("referrer")
+  referralsReceived       Referral[] @relation("referee")
 
   @@map("users")
+}
+
+model Referral {
+  id            String    @id @default(uuid())
+  referrerId    String
+  referrer      User      @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeId     String?   @unique
+  referee       User?     @relation("referee", fields: [refereeId], references: [id], onDelete: SetNull)
+  refereeEmail  String?
+  code          String
+  commission    Float     @default(0)
+  status        String    @default("pending")
+  orderId       String?
+  orderAmount   Float?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("referrals")
 }
 
 model Product {
@@ -80,12 +104,56 @@ model Product {
   exclusive      Boolean        @default(false)
   sold           Boolean        @default(false)
   createdAt      DateTime       @default(now())
-  changelogs    Changelog[]
-  faqs          ProductFaq[]
-  cartItems     CartItem[]
+  changelogs     Changelog[]
+  faqs           ProductFaq[]
+  cartItems      CartItem[]
+  bundleItems    BundleProduct[]
+  flashSales     FlashSale[]
   updatedAt      DateTime @updatedAt
 
   @@map("products")
+}
+
+model Bundle {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  discountPercent Float
+  validFrom       DateTime?
+  validUntil      DateTime?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  products        BundleProduct[]
+
+  @@map("bundles")
+}
+
+model BundleProduct {
+  id        String   @id @default(uuid())
+  bundleId  String
+  productId String
+  bundle    Bundle   @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([bundleId, productId])
+  @@map("bundle_products")
+}
+
+model FlashSale {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  discountPercent Float
+  startTime       DateTime
+  endTime         DateTime
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("flash_sales")
 }
 
 model ServiceEntity {
@@ -169,15 +237,17 @@ model ProductFile {
 }
 
 model DownloadLog {
-  id         String   @id @default(uuid())
-  token      String
-  productId  String
-  email      String
-  ip         String?
-  downloaded Boolean  @default(false)
+  id           String    @id @default(uuid())
+  token        String
+  productId    String
+  email        String
+  ip           String?
+  userAgent    String?
+  country      String?
+  downloaded   Boolean   @default(false)
   downloadedAt DateTime?
-  licenseKey String   @unique
-  createdAt  DateTime @default(now())
+  licenseKey   String    @unique
+  createdAt    DateTime  @default(now())
 
   @@map("download_logs")
 }

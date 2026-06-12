@@ -124,6 +124,27 @@ export class AuthController {
     );
   }
 
+  @Get('github')
+  @UseGuards(AuthGuard('github'))
+  @ApiOperation({ summary: 'Login with GitHub' })
+  githubAuth() {
+    // Guard redirects to GitHub
+  }
+
+  @Get('github/callback')
+  @UseGuards(AuthGuard('github'))
+  @ApiOperation({ summary: 'GitHub OAuth callback' })
+  async githubCallback(@Req() req: any, @Res() res: Response) {
+    const result = await this.authService.findOrCreateOAuthUser(
+      'github',
+      req.user,
+    );
+    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000';
+    res.redirect(
+      `${frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&user=${encodeURIComponent(JSON.stringify(result.user))}`,
+    );
+  }
+
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('login/2fa')
   @ApiOperation({ summary: 'Complete login with 2FA code' })
