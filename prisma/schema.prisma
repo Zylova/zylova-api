@@ -80,6 +80,7 @@ model Product {
   sold           Boolean        @default(false)
   createdAt      DateTime       @default(now())
   changelogs    Changelog[]
+  faqs          ProductFaq[]
   updatedAt      DateTime @updatedAt
 
   @@map("products")
@@ -209,6 +210,19 @@ model Coupon {
   updatedAt     DateTime  @updatedAt
 
   @@map("coupons")
+}
+
+model ProductFaq {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("product_faqs")
 }
 
 model Changelog {

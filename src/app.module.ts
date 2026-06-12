@@ -23,6 +23,7 @@ import { CouponModule } from './coupon/coupon.module';
 import { TicketModule } from './ticket/ticket.module';
 import { ChangelogModule } from './changelog/changelog.module';
 import { LicensesModule } from './licenses/licenses.module';
+import { FaqModule } from './faq/faq.module';
 import { AppController } from './app.controller';
 import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
 
@@ -52,6 +53,7 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     TicketModule,
     ChangelogModule,
     LicensesModule,
+    FaqModule,
   ],
   controllers: [AppController],
 })
