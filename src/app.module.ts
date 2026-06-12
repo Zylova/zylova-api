@@ -24,6 +24,7 @@ import { TicketModule } from './ticket/ticket.module';
 import { ChangelogModule } from './changelog/changelog.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { FaqModule } from './faq/faq.module';
+import { CartModule } from './cart/cart.module';
 import { AppController } from './app.controller';
 import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
 
@@ -54,6 +55,7 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     ChangelogModule,
     LicensesModule,
     FaqModule,
+    CartModule,
   ],
   controllers: [AppController],
 })
