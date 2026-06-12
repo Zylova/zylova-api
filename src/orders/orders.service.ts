@@ -9,16 +9,43 @@ import { v4 as uuid } from 'uuid';
 import { EventsGateway } from '../events/events.gateway';
 import { EmailService } from '../email/email.service';
 import { PaymentService } from '../payment/payment.service';
+import {
+  IsEmail,
+  IsString,
+  IsNumber,
+  IsArray,
+  IsOptional,
+  ValidateNested,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class OrderItemDto {
+  @IsString() id: string;
+  @IsString() name: string;
+  @IsNumber() @Min(0) price: number;
+  @IsNumber() @Min(1) quantity: number;
+}
+
+export class ConfirmPaymentDto {
+  @IsString() downloadToken: string;
+  @IsOptional() @IsString() stripeSession?: string;
+}
+
+export class UpdateOrderStatusDto {
+  @IsString() status: string;
+  @IsOptional() @IsString() refundReason?: string;
+}
 
 export class CreateOrderDto {
-  email: string;
-  items: { id: string; name: string; price: number; quantity: number }[];
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  total: number;
-  paymentMethod: string;
-  stripeSession?: string;
+  @IsEmail() email: string;
+  @IsArray() @ValidateNested({ each: true }) @Type(() => OrderItemDto) items: OrderItemDto[];
+  @IsNumber() @Min(0) subtotal: number;
+  @IsNumber() @Min(0) taxRate: number;
+  @IsNumber() @Min(0) taxAmount: number;
+  @IsNumber() @Min(0) total: number;
+  @IsString() paymentMethod: string;
+  @IsOptional() @IsString() stripeSession?: string;
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -58,7 +85,7 @@ export class OrdersService {
     const order = await this.prisma.order.create({
       data: {
         email: dto.email,
-        items: dto.items,
+        items: dto.items as never,
         subtotal: dto.subtotal,
         taxRate: dto.taxRate,
         taxAmount: dto.taxAmount,

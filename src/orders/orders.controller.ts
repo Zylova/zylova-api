@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { OrdersService, CreateOrderDto } from './orders.service';
+import { OrdersService, CreateOrderDto, ConfirmPaymentDto, UpdateOrderStatusDto } from './orders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -30,7 +30,7 @@ export class OrdersController {
   @Post('confirm')
   @ApiOperation({ summary: 'Confirm payment by download token' })
   confirmPayment(
-    @Body() dto: { downloadToken: string; stripeSession?: string },
+    @Body() dto: ConfirmPaymentDto,
   ) {
     return this.ordersService.confirmPayment(
       dto.downloadToken,
@@ -66,7 +66,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update order status (admin)' })
   updateStatus(
     @Param('id') id: string,
-    @Body() dto: { status: string; refundReason?: string },
+    @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.ordersService.updateStatus(id, dto.status, dto.refundReason);
   }
