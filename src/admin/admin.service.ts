@@ -225,6 +225,66 @@ export class AdminService {
     return { product: updated };
   }
 
+  async getDownloadStats() {
+    const [totalDownloads, uniqueDownloads, downloadsByMonth, topDownloads] =
+      await Promise.all([
+        this.prisma.downloadLog.count({ where: { downloaded: true } }),
+        this.prisma.downloadLog.groupBy({
+          by: ['productId'],
+          where: { downloaded: true },
+        }),
+        this.getDownloadsByMonth(),
+        this.prisma.downloadLog.groupBy({
+          by: ['productId'],
+          where: { downloaded: true },
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 10,
+        }),
+      ]);
+
+    const topProductIds = topDownloads.map((d) => d.productId);
+    const topProducts = topProductIds.length > 0
+      ? await this.prisma.product.findMany({
+          where: { id: { in: topProductIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+
+    const topProductMap = new Map(topProducts.map((p) => [p.id, p.name]));
+    const top = topDownloads.map((d) => ({
+      productId: d.productId,
+      productName: topProductMap.get(d.productId) || 'Unknown',
+      downloads: d._count.id,
+    }));
+
+    return {
+      totalDownloads,
+      uniqueDownloads: uniqueDownloads.length,
+      downloadsByMonth,
+      topDownloads: top,
+    };
+  }
+
+  private async getDownloadsByMonth() {
+    const logs = await this.prisma.downloadLog.findMany({
+      where: { downloaded: true },
+      select: { downloadedAt: true },
+    });
+
+    const monthlyMap = new Map<string, number>();
+    for (const log of logs) {
+      const monthKey = log.downloadedAt
+        ? log.downloadedAt.toISOString().slice(0, 7)
+        : 'unknown';
+      monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
+    }
+
+    return Array.from(monthlyMap.entries())
+      .map(([month, downloads]) => ({ month, downloads }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }
+
   async getStats() {
     const stats = await this._computeStats();
     const revenueByMonth = await this.getRevenueByMonth();

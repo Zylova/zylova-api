@@ -139,6 +139,12 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
+  @Get('stats/downloads')
+  @ApiOperation({ summary: 'Get download analytics' })
+  getDownloadStats() {
+    return this.adminService.getDownloadStats();
+  }
+
   @Get('maintenance')
   @ApiOperation({ summary: 'Get maintenance mode status' })
   getMaintenance(): Record<string, boolean> {
