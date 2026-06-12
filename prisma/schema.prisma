@@ -37,6 +37,7 @@ model User {
   wishlist                String[]  @default([])
   googleId                String?   @unique
   facebookId              String?   @unique
+  githubId                String?   @unique
   refreshToken              String?
   resetToken                String?
   resetTokenExpiry          DateTime?
