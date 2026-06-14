@@ -1,4 +1,4 @@
-﻿-- CreateEnum (if not exists - safe for first run)
+-- CreateEnum (if not exists - safe for first run)
 -- Add product_files table
 CREATE TABLE IF NOT EXISTS "product_files" (
     "id" TEXT NOT NULL,
